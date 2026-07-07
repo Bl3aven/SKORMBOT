@@ -534,13 +534,13 @@ class SetupCog(commands.Cog):
                 )
             return ow
 
-        # 🏠 Accueil & Communauté — everyone can see
+        # 🏠 Accueil & Communauté — hide from everyone, allow verified roles
         accueil = find_category("Accueil")
         if accueil:
             try:
                 await accueil.edit(
                     overwrites={
-                        everyone: discord.PermissionOverwrite(view_channel=True),
+                        everyone: discord.PermissionOverwrite(view_channel=False),
                         **{
                             role_map[n]: discord.PermissionOverwrite(
                                 view_channel=True, send_messages=True,
@@ -557,6 +557,20 @@ class SetupCog(commands.Cog):
                     }
                 )
                 await asyncio.sleep(0.3)
+
+                # │rules is the ONLY channel visible to everyone (pre-verification)
+                rules_channel = next(
+                    (c for c in accueil.text_channels if "rules" in c.name.lower()),
+                    None,
+                )
+                if rules_channel:
+                    await rules_channel.edit(
+                        overwrites={
+                            everyone: discord.PermissionOverwrite(view_channel=True, read_message_history=True),
+                        },
+                        reason="SKORM - rules visible before verification",
+                    )
+                    await asyncio.sleep(0.3)
             except Exception as exc:
                 log.error("Failed to set perms for Accueil: %s", exc)
 
