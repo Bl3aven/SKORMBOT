@@ -195,7 +195,9 @@ class MusicCog(commands.Cog):
 
         player = self._get_player(guild)
 
-        if not player.connected:
+        if player is None or not player.connected:
+            await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
+            return
             await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
             return
 
@@ -212,7 +214,7 @@ class MusicCog(commands.Cog):
 
         player = self._get_player(guild)
 
-        if not player.playing:
+        if player is None or not player.playing:
             await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
             return
 
@@ -227,7 +229,7 @@ class MusicCog(commands.Cog):
 
         player = self._get_player(guild)
 
-        if not player.connected:
+        if player is None or not player.connected:
             await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
             return
 
@@ -247,12 +249,12 @@ class MusicCog(commands.Cog):
         player = self._get_player(guild)
         queue = get_queue(guild.id)
 
-        if not player.playing and queue.is_empty:
+        if player is None or (not player.playing and queue.is_empty):
             await interaction.response.send_message("🎵 File d'attente vide. Utilise `/play <url>` pour commencer !", ephemeral=True)
             return
 
         lines = []
-        if player.current:
+        if player and player.current:
             lines.append(f"**🎵 En lecture :**\n{format_track(player.current, 0)}")
 
         for i, track in enumerate(queue._queue, start=1):
@@ -278,7 +280,7 @@ class MusicCog(commands.Cog):
 
         player = self._get_player(guild)
 
-        if not player.connected:
+        if player is None or not player.connected:
             await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
             return
 
@@ -293,11 +295,12 @@ class MusicCog(commands.Cog):
             return
 
         player = self._get_player(guild)
-        track = player.current
 
-        if not track:
-            await interaction.response.send_message("🎵 Aucune musique en cours.", ephemeral=True)
+        if player is None or player.current is None:
+            await interaction.response.send_message("🎵 Aucune musique en cours de lecture.", ephemeral=True)
             return
+
+        track = player.current
 
         progress = player.position
         duration = track.length
