@@ -50,6 +50,32 @@ CREATE TABLE IF NOT EXISTS events (
     notified_1h INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS music_state (
+    guild_id INTEGER PRIMARY KEY,
+    current_track_data TEXT,
+    current_position INTEGER NOT NULL DEFAULT 0,
+    is_paused INTEGER NOT NULL DEFAULT 0,
+    volume INTEGER NOT NULL DEFAULT 100,
+    voice_channel_id INTEGER,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS music_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    track_data TEXT NOT NULL,
+    FOREIGN KEY (guild_id) REFERENCES music_state(guild_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS music_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    track_data TEXT NOT NULL,
+    FOREIGN KEY (guild_id) REFERENCES music_state(guild_id) ON DELETE CASCADE
+);
 """
 
 
@@ -208,3 +234,70 @@ async def mark_event_notified(event_id: int, kind: str) -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(f"UPDATE events SET {field}=1 WHERE id=?", (event_id,))
         await db.commit()
+
+
+# === Music State Persistence ===
+async def save_music_state(guild_id: int, current_track_data: str | None, position: int, is_paused: bool, volume: int, voice_channel_id: int | None) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO music_state (guild_id, current_track_data, current_position, is_paused, volume, voice_channel_id, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (guild_id, current_track_data, position, int(is_paused), volume, voice_channel_id, datetime.utcnow().isoformat()),
+        )
+        await db.commit()
+
+
+async def get_music_state(guild_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM music_state WHERE guild_id=?", (guild_id,))
+        return await cursor.fetchone()
+
+
+async def delete_music_state(guild_id: int) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM music_state WHERE guild_id=?", (guild_id,))
+        await db.commit()
+
+
+async def save_music_queue(guild_id: int, queue_data: list) -> None:
+    """Save entire queue. queue_data is list of dicts with track info."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM music_queue WHERE guild_id=?", (guild_id,))
+        for i, track in enumerate(queue_data, start=1):
+            await db.execute(
+                "INSERT INTO music_queue (guild_id, position, track_data) VALUES (?, ?, ?)",
+                (guild_id, i, track),
+            )
+        await db.commit()
+
+
+async def get_music_queue(guild_id: int) -> list:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT * FROM music_queue WHERE guild_id=? ORDER BY position ASC",
+            (guild_id,),
+        )
+        return await cursor.fetchall()
+
+
+async def save_music_history(guild_id: int, history_data: list) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM music_history WHERE guild_id=?", (guild_id,))
+        for i, track in enumerate(history_data, start=1):
+            await db.execute(
+                "INSERT INTO music_history (guild_id, position, track_data) VALUES (?, ?, ?)",
+                (guild_id, i, track),
+            )
+        await db.commit()
+
+
+async def get_music_history(guild_id: int) -> list:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT * FROM music_history WHERE guild_id=? ORDER BY position ASC",
+            (guild_id,),
+        )
+        return await cursor.fetchall()

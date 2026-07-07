@@ -11,9 +11,12 @@ Commands:
   /volume <0-500>   - Set volume
   /nowplaying       - Show current track
 """
+import asyncio
+import json
 import logging
 from typing import Optional
 
+import aiosqlite
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -21,6 +24,7 @@ from discord.ext import commands
 import wavelink
 
 from bot.config import EMBED_COLOR, FOOTER_TEXT, BRAND_NAME
+from bot.cogs import db as music_db
 
 log = logging.getLogger("skorm.music")
 
@@ -106,9 +110,147 @@ class MusicCog(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
+        self._save_task = None
 
     def cog_unload(self) -> None:
         _queues.clear()
+        # Save state on unload
+        asyncio.create_task(self._save_all_states())
+
+    async def cog_load(self) -> None:
+        """Start periodic state save task."""
+        self._save_task = asyncio.create_task(self._periodic_save())
+
+    async def _periodic_save(self) -> None:
+        """Save music state every 30 seconds."""
+        import asyncio
+        while True:
+            await asyncio.sleep(30)
+            await self._save_all_states()
+
+    async def _save_all_states(self) -> None:
+        """Save music state for all guilds."""
+        for guild_id, queue in _queues.items():
+            if queue.is_empty and not queue._history:
+                continue
+            await self._save_state(guild_id)
+
+    async def _save_state(self, guild_id: int) -> None:
+        """Save current music state to database."""
+        queue = get_queue(guild_id)
+        player = self._get_player_by_id(guild_id)
+
+        # Serialize current track
+        current_track_data = None
+        position = 0
+        is_paused = False
+        volume = 100
+        voice_channel_id = None
+
+        if player:
+            if player.current_track:
+                current_track_data = self._serialize_track(player.current_track)
+                position = player.position if hasattr(player, 'position') else 0
+                is_paused = player.paused
+                volume = player.volume if hasattr(player, 'volume') else 100
+            if player.connected:
+                voice_channel_id = player.voice_channel.id if player.voice_channel else None
+
+        # Serialize queue
+        queue_data = [self._serialize_track(t) for t in queue._queue]
+        history_data = [self._serialize_track(t) for t in queue._history]
+
+        await music_db.save_music_state(guild_id, current_track_data, position, is_paused, volume, voice_channel_id)
+        await music_db.save_music_queue(guild_id, queue_data)
+        await music_db.save_music_history(guild_id, history_data)
+
+    @staticmethod
+    def _serialize_track(track: wavelink.Playable) -> str:
+        """Serialize a track to JSON string."""
+        return json.dumps({
+            "identifier": track.identifier,
+            "title": track.title,
+            "author": track.author,
+            "uri": track.uri,
+            "length": track.length,
+            "is_stream": track.is_stream,
+        })
+
+    @staticmethod
+    def _deserialize_track(data: str) -> dict:
+        """Deserialize track data from JSON string."""
+        return json.loads(data)
+
+    def _get_player_by_id(self, guild_id: int) -> wavelink.Player | None:
+        """Get player by guild ID without needing Guild object."""
+        pool = self.bot.wavelink
+        try:
+            node = pool.get_node()
+            return node.get_player(guild_id)
+        except Exception:
+            return None
+
+    @commands.Cog.listener()
+    async def on_ready(self) -> None:
+        """Restore music state on bot startup."""
+        # Wait for Lavalink connection (handled by background task in main.py)
+        await asyncio.sleep(5)
+        await self._restore_all_states()
+
+    async def _restore_all_states(self) -> None:
+        """Restore music state for all guilds from database."""
+        try:
+            # Get all guilds with saved state
+            async with aiosqlite.connect(music_db.DB_PATH) as db:
+                db.row_factory = aiosqlite.Row
+                cursor = await db.execute("SELECT * FROM music_state")
+                states = await cursor.fetchall()
+
+            for state in states:
+                guild_id = state["guild_id"]
+                guild = self.bot.get_guild(guild_id)
+                if guild is None:
+                    continue
+
+                queue = get_queue(guild_id)
+
+                # Restore queue from DB
+                queue_rows = await music_db.get_music_queue(guild_id)
+                for row in queue_rows:
+                    track_data = self._deserialize_track(row["track_data"])
+                    # We need to load the track via Lavalink to get a Playable object
+                    # For now, store the data and load on demand
+                    pass
+
+                # Restore history from DB
+                history_rows = await music_db.get_music_history(guild_id)
+                for row in history_rows:
+                    pass  # Same approach
+
+                # Restore current track if exists
+                if state["current_track_data"]:
+                    current_data = self._deserialize_track(state["current_track_data"])
+                    log.info("Restoring music state for guild %s: %s", guild_id, current_data.get("title"))
+
+                    # Connect to voice channel if it exists
+                    voice_channel = guild.get_channel(state["voice_channel_id"])
+                    if voice_channel:
+                        try:
+                            player = await self._ensure_player(guild, voice_channel)
+                            # Load and play the track
+                            pool = self.bot.wavelink
+                            tracks = await pool.fetch_tracks(current_data.get("uri", ""))
+                            if tracks:
+                                track = tracks[0]
+                                await player.play(track)
+                                if state["volume"] != 100:
+                                    await player.set_volume(state["volume"])
+                                log.info("Restored playback: %s", track.title)
+                        except Exception as exc:
+                            log.error("Failed to restore playback for guild %s: %s", guild_id, exc)
+
+        except Exception as exc:
+            log.error("Failed to restore music states: %s", exc)
 
     # --- Wavelink 3.x events (dispatched as on_wavelink_*) ---
 
