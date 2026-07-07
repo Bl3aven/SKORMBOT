@@ -102,12 +102,16 @@ class MusicCog(commands.Cog):
         guild_id = player.guild.id
         queue = get_queue(guild_id)
 
+        log.info("Track ended in guild %s, queue size: %d", guild_id, queue.length)
+
         if queue.is_empty:
+            log.info("Queue empty, stopping player in guild %s", guild_id)
             await player.stop()
             return
 
         next_track = queue.get()
         if next_track:
+            log.info("Auto-playing next track from queue: %s", next_track.title)
             await player.play(next_track)
 
     @commands.Cog.listener("on_wavelink_track_stuck")
@@ -208,8 +212,6 @@ class MusicCog(commands.Cog):
         if player is None or not player.connected:
             await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
             return
-            await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
-            return
 
         get_queue(guild.id).clear()
         await player.stop()
@@ -218,8 +220,16 @@ class MusicCog(commands.Cog):
 
     @app_commands.command(name="skip", description="Passe à la piste suivante")
     async def skip(self, interaction: discord.Interaction) -> None:
+        await self._handle_next(interaction)
+
+    @app_commands.command(name="next", description="Passe à la musique suivante")
+    async def next_track(self, interaction: discord.Interaction) -> None:
+        await self._handle_next(interaction)
+
+    async def _handle_next(self, interaction: discord.Interaction) -> None:
         guild = interaction.guild
         if guild is None:
+            await interaction.response.send_message("❌ Cette commande ne fonctionne que dans un serveur.", ephemeral=True)
             return
 
         player = self._get_player(guild)
@@ -228,8 +238,23 @@ class MusicCog(commands.Cog):
             await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
             return
 
-        await player.skip()
-        await interaction.response.send_message("⏭ Piste suivante.")
+        queue = get_queue(guild.id)
+
+        if queue.is_empty:
+            # No queued tracks — just skip current
+            await player.skip()
+            await interaction.response.send_message("⏭ Piste suivante (file vide).")
+            return
+
+        # Play next from queue
+        next_track = queue.get()
+        if next_track:
+            log.info("Skipping to next queued track: %s", next_track.title)
+            await player.play(next_track)
+            await interaction.response.send_message(f"⏭ Lecture suivante :\n{format_track(next_track)}")
+        else:
+            await player.skip()
+            await interaction.response.send_message("⏭ Piste suivante.")
 
     @app_commands.command(name="pause", description="Met en pause ou reprend la lecture")
     async def pause(self, interaction: discord.Interaction) -> None:
