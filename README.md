@@ -6,8 +6,6 @@ Bot Discord administrateur pour serveur créatif/agency. Il configure, automatis
 modère l'ensemble du serveur — identité visuelle noir/blanc/gris, branding
 minimaliste, expérience fluide.
 
-**[🔧 SKORMAgency (private fork)](https://github.com/Bl3aven/ia-workspace/tree/master/projects/SKORMAgency)** — Version privée avec configuration spécifique.
-
 ---
 
 ## ✨ Fonctionnalités
@@ -28,7 +26,7 @@ minimaliste, expérience fluide.
 ## 📁 Structure du projet
 
 ```
-SKORMAgency/
+SKORMBOT/
 ├── PROJECT.md                 # Cahier des charges / suivi
 ├── README.md                  # ← ce fichier
 ├── .env.example               # Template des variables d'environnement
@@ -66,7 +64,8 @@ SKORMAgency/
 ### 1. Cloner & configurer
 
 ```bash
-cd projects/SKORMAgency
+git clone https://github.com/Bl3aven/SKORMBOT.git
+cd SKORMBOT
 cp .env.example .env
 # Édite .env avec ton BOT_TOKEN et ton OWNER_ID
 ```
@@ -106,9 +105,11 @@ Le bot va créer **~25 rôles**, **6 catégories**, **~80 salons textuels**,
 ## 🐳 Déploiement Docker (VPS OVH .57)
 
 ```bash
+git clone https://github.com/Bl3aven/SKORMBOT.git /opt/skorm-bot
 cd /opt/skorm-bot
 cp .env.example .env
-nano .env                         # chmod 600 après édition
+nano .env                         # Remplir BOT_TOKEN, SERVER_ID, OWNER_ID
+chmod 600 .env
 docker compose up -d --build
 docker compose logs -f skorm-bot
 ```
