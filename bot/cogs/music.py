@@ -309,6 +309,11 @@ class MusicCog(commands.Cog):
         player = self._get_player(guild)
         if player is None:
             raise RuntimeError("Player not created after voice connect")
+        
+        # Save voice channel ID to queue for persistence
+        queue = get_queue(guild.id)
+        queue.voice_channel_id = voice_channel.id
+        
         return player
 
     # --- Slash commands ---
