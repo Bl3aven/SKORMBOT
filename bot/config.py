@@ -41,3 +41,8 @@ DB_PATH = os.path.join(DATA_DIR, "skorm.db")
 BRAND_NAME = "SKORM"
 BRAND_TAGLINE = "CREATE. CONNECT. DEVELOP."
 FOOTER_TEXT = "SKORM — CREATE. CONNECT. DEVELOP."
+
+# === Lavalink (Music) ===
+LAVALINK_HOST = os.getenv("LAVALINK_HOST", "lavalink")
+LAVALINK_PORT = int(os.getenv("LAVALINK_PORT", "2333"))
+LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD", "skorm")

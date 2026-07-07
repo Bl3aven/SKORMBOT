@@ -10,8 +10,13 @@ import traceback
 import discord
 from discord.ext import commands
 
-from bot.config import BOT_TOKEN, BRAND_NAME, BRAND_TAGLINE, SERVER_ID, OWNER_ID
+from bot.config import (
+    BOT_TOKEN, BRAND_NAME, BRAND_TAGLINE, SERVER_ID, OWNER_ID,
+    LAVALINK_HOST, LAVALINK_PORT, LAVALINK_PASSWORD,
+)
 from bot.cogs import db
+
+import wavelink
 
 
 # === Logging ===
@@ -38,6 +43,7 @@ COGS = [
     "bot.cogs.antispam",
     "bot.cogs.reminders",
     "bot.cogs.moderation",
+    "bot.cogs.music",
 ]
 
 
@@ -49,6 +55,18 @@ async def load_cogs() -> None:
         except Exception as exc:
             log.error("Failed to load cog %s: %s", ext, exc)
             traceback.print_exc()
+
+    # Connect to Lavalink
+    try:
+        bot.wavelink = await wavelink.connect(
+            f"{LAVALINK_HOST}:{LAVALINK_PORT}",
+            password=LAVALINK_PASSWORD,
+            http_trace=False,
+        )
+        log.info("Connected to Lavalink at %s:%s", LAVALINK_HOST, LAVALINK_PORT)
+    except Exception as exc:
+        log.error("Failed to connect to Lavalink: %s", exc)
+        bot.wavelink = None
 
 
 @bot.event

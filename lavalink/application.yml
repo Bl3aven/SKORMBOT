@@ -1,0 +1,26 @@
+server:
+  port: 2333
+  ssl:
+    enabled: false
+
+lavalink:
+  server:
+    password: ${LAVALINK_PASSWORD:skorm}
+    sources:
+      - youtube
+      - soundcloud
+      - bandcamp
+      - twitch
+      - vimeo
+      - http
+      - local
+    bufferDuration: -1
+    frameBufferDuration: 5000
+    opusEncodingQuality: 10
+    resamplingQuality: HIGH
+    trackStuckThreshold: 10000
+    useSeekGetters: true
+    youtubePlaylistLoadLimit: 10
+    playerUpdateInterval: 5
+    youtubeSearchEnabled: true
+    soundcloudSearchEnabled: true

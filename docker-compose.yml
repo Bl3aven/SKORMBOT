@@ -8,3 +8,22 @@ services:
       - ./data:/app/data
     env_file:
       - .env
+    depends_on:
+      - lavalink
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  lavalink:
+    image: fredboat/lavalink:latest
+    container_name: skorm-lavalink
+    restart: unless-stopped
+    ports:
+      - "2333:2333"
+    volumes:
+      - ./lavalink/application.yml:/opt/Lavalink/application.yml:ro
+    environment:
+      - SERVER_PORT=2333
+      - LAVALINK_SERVER_PASSWORD=${LAVALINK_PASSWORD:skorm}
+
+volumes:
+  lavalink:
