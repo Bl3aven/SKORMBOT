@@ -148,8 +148,8 @@ class MusicCog(commands.Cog):
         voice_channel_id = None
 
         if player:
-            if player.current_track:
-                current_track_data = self._serialize_track(player.current_track)
+            if player.current:
+                current_track_data = self._serialize_track(player.current)
                 position = player.position if hasattr(player, 'position') else 0
                 is_paused = player.paused
                 volume = player.volume if hasattr(player, 'volume') else 100
@@ -353,8 +353,8 @@ class MusicCog(commands.Cog):
 
             if player.playing:
                 # Save current track to history
-                if player.current_track:
-                    queue.push_history(player.current_track)
+                if player.current:
+                    queue.push_history(player.current)
                 await player.play(track)
             else:
                 await player.play(track)
@@ -442,8 +442,8 @@ class MusicCog(commands.Cog):
             return
 
         # Save current track to history if playing
-        if player.current_track:
-            queue.push_history(player.current_track)
+        if player.current:
+            queue.push_history(player.current)
 
         prev_track = queue.get_previous()
         if prev_track:
@@ -468,8 +468,8 @@ class MusicCog(commands.Cog):
         queue = get_queue(guild.id)
 
         # Save current track to history before skipping
-        if player.current_track:
-            queue.push_history(player.current_track)
+        if player.current:
+            queue.push_history(player.current)
 
         if queue.is_empty:
             # No queued tracks — just skip current
@@ -522,8 +522,8 @@ class MusicCog(commands.Cog):
         lines = []
 
         # Current track
-        if player and player.current_track:
-            current = player.current_track
+        if player and player.current:
+            current = player.current
             duration = current.length // 1000 if current.length else 0
             minutes = duration // 60
             seconds = duration % 60
