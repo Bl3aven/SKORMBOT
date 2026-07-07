@@ -192,10 +192,19 @@ class MusicCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self) -> None:
-        """Restore music state on bot startup."""
-        # Wait for Lavalink connection (handled by background task in main.py)
-        await asyncio.sleep(5)
-        await self._restore_all_states()
+        """Restore music state on bot startup after Lavalink is connected."""
+        # Wait for Lavalink to be connected before restoring
+        for attempt in range(30):  # Max 30 seconds
+            await asyncio.sleep(1)
+            try:
+                node = self.bot.wavelink.get_node()
+                if node and node.connected:
+                    log.info("Lavalink connected, restoring music state...")
+                    await self._restore_all_states()
+                    return
+            except Exception:
+                pass
+        log.warning("Lavalink not connected after 30s, skipping music restore")
 
     async def _restore_all_states(self) -> None:
         """Restore music state for all guilds from database."""
