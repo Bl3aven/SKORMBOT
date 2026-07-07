@@ -550,7 +550,7 @@ class SetupCog(commands.Cog):
                                 list(DIRECTION_ROLES)
                                 + list(STAFF_ROLES)
                                 + ["Artist", "Agent", "Student",
-                                   "Verified Member", "Community", "Partner"]
+                                   "Verified", "Verified Member", "Community", "Partner"]
                             )
                             if n in role_map
                         },
