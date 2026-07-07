@@ -102,7 +102,12 @@ class MusicCog(commands.Cog):
         guild_id = player.guild.id
         queue = get_queue(guild_id)
 
-        log.info("Track ended in guild %s, queue size: %d", guild_id, queue.length)
+        log.info("Track ended in guild %s, queue size: %d, player playing: %s", guild_id, queue.length, player.playing)
+
+        # If player is already playing, a new track was started (e.g. by /next) — don't stop
+        if player.playing:
+            log.info("Player already playing new track, skipping queue handling")
+            return
 
         if queue.is_empty:
             log.info("Queue empty, stopping player in guild %s", guild_id)
