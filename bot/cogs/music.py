@@ -393,6 +393,9 @@ class MusicCog(commands.Cog):
             await interaction.followup.send(
                 f"🎵 En lecture :\n{format_track(track)}"
             )
+        
+        # Save state immediately after adding track
+        await self._save_state(guild.id)
 
     @app_commands.command(name="stop", description="Arrête la musique et vide la file d'attente")
     async def stop(self, interaction: discord.Interaction) -> None:
