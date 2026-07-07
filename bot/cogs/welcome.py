@@ -76,48 +76,7 @@ class WelcomeCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
-        guild = member.guild
-        welcome_channel = get_channel_by_name(guild, WELCOME_CHANNEL_NAME)
-        rules_channel = get_channel_by_name(guild, RULES_CHANNEL_NAME)
-        roles_channel = get_channel_by_name(guild, ROLES_CHANNEL_NAME)
-
-        # 1. Post welcome message in │welcome
-        if welcome_channel:
-            try:
-                embed = create_embed(
-                    title=f"🌩️ Welcome to SKORM, {member.display_name} !",
-                    description=(
-                        "**CREATE. CONNECT. DEVELOP.**\n\n"
-                        f"{member.mention} just joined the server !"
-                    ),
-                    color=0xFFFFFF,
-                )
-                await welcome_channel.send(embed=embed)
-            except Exception as exc:
-                log.error("Failed to send welcome message: %s", exc)
-
-        # 2. Send DM with welcome + 2 tasks
-        try:
-            dm_embed = create_embed(
-                title="🌩️ Welcome to SKORM !",
-                description=(
-                    "**CREATE. CONNECT. DEVELOP.**\n\n"
-                    "You just joined the official SKORM server.\n\n"
-                    "To access the server, complete these 2 steps :\n\n"
-                    "1️⃣ **Accept the rules**\n"
-                    f"   Go to <#{rules_channel.id}> and react with ✅\n"
-                    if rules_channel else "   Go to │rules and react with ✅\n"
-                    "2️⃣ **Choose your role**\n"
-                    f"   Go to <#{roles_channel.id}> and select your path"
-                    if roles_channel else "   Go to │claim-your-roles and select your path",
-                ),
-                color=0xFFFFFF,
-            )
-            await member.send(embed=dm_embed)
-        except discord.Forbidden:
-            log.warning("DM blocked for %s", member)
-        except Exception as exc:
-            log.error("Failed to send DM to %s: %s", member, exc)
+        log.info("Member joined: %s", member.display_name)
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent) -> None:
@@ -181,25 +140,6 @@ class WelcomeCog(commands.Cog):
         # Remove reaction after verification
         try:
             await rules_channel.remove_reaction(payload.emoji, member, payload.message_id)
-        except Exception:
-            pass
-
-        # Send confirmation in DM
-        roles_channel = get_channel_by_name(guild, ROLES_CHANNEL_NAME)
-        try:
-            confirm_embed = create_embed(
-                title="✅ Rules accepted !",
-                description=(
-                    "You are now verified on SKORM.\n\n"
-                    "One step remaining :\n\n"
-                    f"🎭 **Choose your role** in <#{roles_channel.id}>"
-                    if roles_channel else "🎭 Choose your role in │claim-your-roles",
-                ),
-                color=0x00FF00,
-            )
-            await member.send(embed=confirm_embed)
-        except discord.Forbidden:
-            pass
         except Exception:
             pass
 
