@@ -68,6 +68,8 @@ async def on_ready() -> None:
     log.info("=" * 60)
 
     # Connect to Lavalink (must be after on_ready so bot.user is available)
+    # Small delay to let Lavalink finish starting up
+    await asyncio.sleep(3)
     try:
         pool = wavelink.Pool()
         await pool.connect(
