@@ -145,7 +145,7 @@ async def on_command_error(ctx: commands.Context, error: commands.CommandError) 
         return
     log.error("Command error in %s: %s", ctx.command, error)
     try:
-        await ctx.send(f"❌ Erreur : `{error}`")
+        await ctx.send(f"❌ Error: `{error}`")
     except Exception:
         pass
 
@@ -159,11 +159,11 @@ async def on_app_command_error(
     try:
         if interaction.response.is_done():
             await interaction.followup.send(
-                f"❌ Erreur : `{error}`", ephemeral=True
+                f"❌ Error: `{error}`", ephemeral=True
             )
         else:
             await interaction.response.send_message(
-                f"❌ Erreur : `{error}`", ephemeral=True
+                f"❌ Error: `{error}`", ephemeral=True
             )
     except Exception:
         pass

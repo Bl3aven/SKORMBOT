@@ -26,7 +26,7 @@ log = logging.getLogger("skorm.setup")
 CATEGORIES = [
     {"name": "🌩️ SKORM", "position": 0},
     {"name": "──────────────", "position": 1},
-    {"name": "🏠 Accueil & Communauté", "position": 2},
+    {"name": "🏠 Welcome & Community", "position": 2},
     {"name": "──────────────", "position": 3},
     {"name": "🎤 Artistes", "position": 10},
     {"name": "──────────────", "position": 11},
@@ -41,7 +41,7 @@ CATEGORIES = [
 
 
 CHANNELS_PER_CATEGORY = {
-    "🏠 Accueil & Communauté": {
+    "🏠 Welcome & Community": {
         "text": [
             ("📌│welcome", {"news": True}),
             ("📖│rules", {}),
@@ -138,7 +138,7 @@ CHANNELS_PER_CATEGORY = {
             ("🎤│live-classes", {}),
             ("🧠│mentoring", {}),
         ],
-        "voice": ["🏫│Classroom 1", "🏫│Classroom 2", "🎓│Coaching Individuel", "👥│Coaching Groupe", "❓│Questions / Réponses"],
+        "voice": ["🏫│Classroom 1", "🏫│Classroom 2", "🎓│Individual Coaching", "👥│Group Coaching", "❓│Questions / Answers"],
     },
     "🔒 Staff": {
         "text": [
@@ -168,11 +168,11 @@ ROLES = [
     # Staff
     {"name": "Moderator", "color": COLOR_GRAY, "hoist": True, "mentionable": True},
     {"name": "Support", "color": COLOR_GRAY, "hoist": True, "mentionable": True},
-    {"name": "Coach Artistique", "color": COLOR_GRAY, "hoist": True, "mentionable": True},
-    {"name": "Coach Production", "color": COLOR_GRAY, "hoist": True, "mentionable": True},
-    {"name": "Coach DJ", "color": COLOR_GRAY, "hoist": True, "mentionable": True},
-    {"name": "Coach Social Media", "color": COLOR_GRAY, "hoist": True, "mentionable": True},
-    {"name": "Formateur", "color": COLOR_GRAY, "hoist": True, "mentionable": True},
+    {"name": "Artistic Coach", "color": COLOR_GRAY, "hoist": True, "mentionable": True},
+    {"name": "Production Coach", "color": COLOR_GRAY, "hoist": True, "mentionable": True},
+    {"name": "DJ Coach", "color": COLOR_GRAY, "hoist": True, "mentionable": True},
+    {"name": "Social Media Coach", "color": COLOR_GRAY, "hoist": True, "mentionable": True},
+    {"name": "Trainer", "color": COLOR_GRAY, "hoist": True, "mentionable": True},
     # Membres
     {"name": "Artist", "color": COLOR_DARK_GRAY, "hoist": False, "mentionable": True},
     {"name": "Agent", "color": COLOR_DARK_GRAY, "hoist": False, "mentionable": True},
@@ -182,7 +182,7 @@ ROLES = [
     {"name": "Community", "color": COLOR_DARK_GRAY, "hoist": False, "mentionable": True},
     {"name": "Partner", "color": COLOR_DARK_GRAY, "hoist": False, "mentionable": True},
     # Formations
-    {"name": "IA Musicale", "color": COLOR_MED_GRAY, "hoist": False, "mentionable": True},
+    {"name": "Musical AI", "color": COLOR_MED_GRAY, "hoist": False, "mentionable": True},
     {"name": "Suno", "color": COLOR_MED_GRAY, "hoist": False, "mentionable": True},
     {"name": "Production", "color": COLOR_MED_GRAY, "hoist": False, "mentionable": True},
     {"name": "DJ Performance", "color": COLOR_MED_GRAY, "hoist": False, "mentionable": True},
@@ -197,11 +197,11 @@ ROLES = [
 DIRECTION_ROLES = {"Founder", "CEO", "Creative Director", "Label Founder", "Admin"}
 STAFF_ROLES = {
     "Moderator", "Support",
-    "Coach Artistique", "Coach Production", "Coach DJ", "Coach Social Media",
-    "Formateur",
+    "Artistic Coach", "Production Coach", "DJ Coach", "Social Media Coach",
+    "Trainer",
 }
 COACH_ROLES = {
-    "Coach Artistique", "Coach Production", "Coach DJ", "Coach Social Media",
+    "Artistic Coach", "Production Coach", "DJ Coach", "Social Media Coach",
 }
 FORMATION_ROLES = {"IA Musicale", "Suno", "Production", "DJ Performance", "Social Media", "Marketing"}
 
@@ -220,7 +220,7 @@ class SetupCog(commands.Cog):
 
     @app_commands.command(
         name="debug",
-        description="Debug: liste tous les salons (owner only).",
+        description="Debug: lists all channels (owner only).",
     )
     async def debug_channels(self, interaction: discord.Interaction) -> None:
         if OWNER_ID and interaction.user.id != OWNER_ID:
@@ -247,23 +247,23 @@ class SetupCog(commands.Cog):
 
     @app_commands.command(
         name="setup",
-        description="Crée l'intégralité de la structure SKORM (owner only).",
+        description="Creates the entire SKORM structure (owner only).",
     )
     @app_commands.checks.has_permissions(administrator=True)
-    @app_commands.describe(clean="Supprime les anciens salons et catégories orphelines.")
+    @app_commands.describe(clean="Deletes old channels and orphan categories.")
     async def setup(
         self, interaction: discord.Interaction, clean: bool = False
     ) -> None:
         if OWNER_ID and interaction.user.id != OWNER_ID:
             await interaction.response.send_message(
-                "❌ Cette commande est réservée à l'owner du bot.", ephemeral=True
+                "❌ This command is reserved for the bot owner.", ephemeral=True
             )
             return
 
         guild = interaction.guild
         if guild is None:
             await interaction.response.send_message(
-                "❌ Cette commande doit être exécutée dans un serveur.", ephemeral=True
+                "❌ This command must be run in a server.", ephemeral=True
             )
             return
 
@@ -278,68 +278,68 @@ class SetupCog(commands.Cog):
         # 0. Cleanup old channels & categories (if requested)
         if clean:
             await interaction.edit_original_response(
-                content="⏳ Nettoyage des anciens salons…"
+                content="⏳ Cleaning old channels…"
             )
             await self._cleanup_old(guild, report)
 
         # 1. Roles (must be created before setting permission overwrites)
         await interaction.edit_original_response(
-            content="⏳ Création des rôles…"
+            content="⏳ Creating roles…"
         )
         created_roles = await self._create_roles(guild, report)
 
         # 2. Categories
         await interaction.edit_original_response(
-            content="⏳ Création des catégories…"
+            content="⏳ Creating categories…"
         )
         category_map = await self._create_categories(guild, report)
 
         # 3. Channels
         await interaction.edit_original_response(
-            content="⏳ Création des salons…"
+            content="⏳ Creating channels…"
         )
         await self._create_channels(guild, category_map, report)
 
         # 4. Permissions
         await interaction.edit_original_response(
-            content="⏳ Application des permissions…"
+            content="⏳ Applying permissions…"
         )
         await self._apply_permissions(guild, category_map, created_roles)
 
         # 5. Hierarchy
         await interaction.edit_original_response(
-            content="⏳ Application de la hiérarchie…"
+            content="⏳ Applying hierarchy…"
         )
         await self._apply_role_hierarchy(guild, created_roles)
 
         # 6. Voice channel security
         await interaction.edit_original_response(
-            content="⏳ Sécurisation des salons vocaux…"
+            content="⏳ Securing voice channels…"
         )
         voice_secured = await self._secure_voice_channels(guild, created_roles, report)
 
         # 7. Confirmation
         summary = (
-            f"**Catégories** : {len(report['categories'])}\n"
-            f"**Salons textuels** : {len(report['text_channels'])}\n"
-            f"**Salons vocaux** : {len(report['voice_channels'])}\n"
-            f"**Rôles** : {len(report['roles'])}\n"
-            f"**🔒 Salons vocaux sécurisés** : {voice_secured}\n"
+            f"**Categories** : {len(report['categories'])}\n"
+            f"**Text channels** : {len(report['text_channels'])}\n"
+            f"**Voice channels** : {len(report['voice_channels'])}\n"
+            f"**Roles** : {len(report['roles'])}\n"
+            f"**🔒 Voice channels secured** : {voice_secured}\n"
         )
         if clean:
             summary += (
-                f"**🗑️ Catégories supprimées** : {len(report['deleted_categories'])}\n"
-                f"**🗑️ Salons supprimés** : {len(report['deleted_channels'])}\n"
+                f"**🗑️ Deleted categories** : {len(report['deleted_categories'])}\n"
+                f"**🗑️ Deleted channels** : {len(report['deleted_channels'])}\n"
             )
-        summary += f"**Erreurs** : {len(report['errors'])}"
+        summary += f"**Errors** : {len(report['errors'])}"
         embed = create_embed(
-            title="✅ Setup SKORM terminé",
+            title="✅ SKORM setup complete",
             description=summary,
             color=0xFFFFFF,
         )
         if report["errors"]:
             error_list = "\n".join(f"• {e}" for e in report["errors"][:10])
-            embed.add_field(name="⚠️ Erreurs", value=error_list[:1024], inline=False)
+            embed.add_field(name="⚠️ Errors", value=error_list[:1024], inline=False)
         await interaction.edit_original_response(content=None, embed=embed)
 
         # Send confirmation in the first available text channel of Accueil category
@@ -347,13 +347,13 @@ class SetupCog(commands.Cog):
         if welcome_channel is not None:
             try:
                 await welcome_channel.send(embed=create_embed(
-                    title="🌩️ Serveur SKORM configuré",
+                    title="🌩️ SKORM server configured",
                     description=(
                         "**CREATE. CONNECT. DEVELOP.**\n\n"
-                        "Le serveur SKORM est désormais opérationnel.\n"
-                        "Tous les salons, rôles et permissions sont en place.\n\n"
-                        "Lis le règlement et clique sur le bouton de vérification "
-                        "pour accéder au serveur."
+                        "The SKORM server is now operational.\n"
+                        "All channels, roles, and permissions are in place.\n\n"
+                        "Read the rules and click the verification button "
+                        "to access the server."
                     ),
                 ))
             except Exception as exc:

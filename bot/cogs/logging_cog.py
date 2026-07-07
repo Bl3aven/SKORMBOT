@@ -45,19 +45,19 @@ class LoggingCog(commands.Cog):
         if target is None:
             return
         fields = [
-            ("Utilisateur", f"{user.mention} (`{user.id}`)", True),
+            ("User", f"{user.mention} (`{user.id}`)", True),
         ]
         if moderator:
-            fields.append(("Modérateur", f"{moderator.mention} (`{moderator.id}`)", True))
+            fields.append(("Moderator", f"{moderator.mention} (`{moderator.id}`)", True))
         if channel:
-            fields.append(("Salon", channel.mention, True))
+            fields.append(("Channel", channel.mention, True))
         if reason:
-            fields.append(("Raison", reason[:1024], False))
+            fields.append(("Reason", reason[:1024], False))
         if extra_fields:
             fields.extend(extra_fields)
         embed = create_embed(
             title=f"📕 {action}",
-            description=f"Action effectuée le {datetime.utcnow().strftime('%d/%m/%Y %H:%M UTC')}",
+            description=f"Action performed on {datetime.utcnow().strftime('%d/%m/%Y %H:%M UTC')}",
             fields=fields,
         )
         try:
@@ -80,12 +80,12 @@ class LoggingCog(commands.Cog):
             return
         content_preview = (message.content or "")[:1024] or "[embed/attachment]"
         embed = create_embed(
-            title="🗑️ Message supprimé",
+            title="🗑️ Message deleted",
             description=(
-                f"**Auteur** : {message.author.mention}\n"
-                f"**Salon** : {message.channel.mention}"
+                f"**Author** : {message.author.mention}\n"
+                f"**Channel** : {message.channel.mention}"
             ),
-            fields=[("Contenu", f"```{content_preview}```", False)],
+            fields=[("Content", f"```{content_preview}```", False)],
         )
         try:
             await target.send(embed=embed)
@@ -106,15 +106,15 @@ class LoggingCog(commands.Cog):
         if before.channel.id == target.id:
             return
         embed = create_embed(
-            title="✏️ Message édité",
+            title="✏️ Message edited",
             description=(
-                f"**Auteur** : {before.author.mention}\n"
-                f"**Salon** : {before.channel.mention}\n"
-                f"[Aller au message]({after.jump_url})"
+                f"**Author** : {before.author.mention}\n"
+                f"**Channel** : {before.channel.mention}\n"
+                f"[Go to message]({after.jump_url})"
             ),
             fields=[
-                ("Avant", f"```{before.content[:1024] or '[embed]'}```", False),
-                ("Après", f"```{after.content[:1024] or '[embed]'}```", False),
+                ("Before", f"```{before.content[:1024] or '[embed]'}```", False),
+                ("After", f"```{after.content[:1024] or '[embed]'}```", False),
             ],
         )
         try:
@@ -126,7 +126,7 @@ class LoggingCog(commands.Cog):
     async def on_member_ban(self, guild: discord.Guild, user: discord.User) -> None:
         await self.log_action(
             guild=guild,
-            action="Utilisateur banni",
+            action="User banned",
             user=user,
         )
 
@@ -135,7 +135,7 @@ class LoggingCog(commands.Cog):
         # Try to distinguish kick via audit logs
         await self.log_action(
             guild=member.guild,
-            action="Membre parti",
+            action="Member left",
             user=member,
         )
 

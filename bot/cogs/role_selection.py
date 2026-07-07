@@ -65,7 +65,7 @@ class RoleSelectionView(discord.ui.View):
         member = interaction.user
         if guild is None or not isinstance(member, discord.Member):
             await interaction.response.send_message(
-                "❌ Action indisponible.", ephemeral=True
+                "❌ Action unavailable.", ephemeral=True
             )
             return
 
@@ -73,7 +73,7 @@ class RoleSelectionView(discord.ui.View):
         if role is None:
             log.warning("Role %s not found in %s", role_name, guild.name)
             await interaction.response.send_message(
-                f"❌ Rôle `{role_name}` introuvable.", ephemeral=True
+                f"❌ Role `{role_name}` not found.", ephemeral=True
             )
             return
 
@@ -84,8 +84,8 @@ class RoleSelectionView(discord.ui.View):
                 other_role = get_role_by_name(guild, other_name)
                 if other_role and other_role in member.roles:
                     await interaction.response.send_message(
-                        f"❌ Tu ne peux pas être **{role_name}** et **{other_name}** en même temps.\n"
-                        f"Retire d'abord le rôle **{other_name}** avec le bouton ci-dessous.",
+                        f"❌ You can't be **{role_name}** and **{other_name}** at the same time.\n"
+                        f"First remove the **{other_name}** role using the button below.",
                         ephemeral=True,
                     )
                     return
@@ -94,8 +94,8 @@ class RoleSelectionView(discord.ui.View):
         if role in member.roles:
             await member.remove_roles(role, reason=f"Role selection: removed {role_name}")
             embed = create_embed(
-                title=f"🔴 Rôle retiré",
-                description=f"Tu as retiré le rôle **{role_name}**.",
+                title=f"🔴 Role removed",
+                description=f"You removed the **{role_name}** role.",
                 color=0xFF0000,
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -110,8 +110,8 @@ class RoleSelectionView(discord.ui.View):
             if alert_channel:
                 try:
                     alert_embed = create_embed(
-                        title=f"🌩️ Nouveau membre dans {role_name}",
-                        description=f"{member.mention} a rejoint le groupe **{role_name}**.",
+                        title=f"🌩️ New member in {role_name}",
+                        description=f"{member.mention} has joined the **{role_name}** group.",
                         color=0xFFFFFF,
                     )
                     await alert_channel.send(embed=alert_embed)
@@ -119,8 +119,8 @@ class RoleSelectionView(discord.ui.View):
                     log.error("Failed to send alert in %s: %s", alert_channel_name, exc)
 
         embed = create_embed(
-            title=f"✅ Rôle attribué",
-            description=f"Tu as obtenu le rôle **{role_name}**.",
+            title=f"✅ Role assigned",
+            description=f"You got the **{role_name}** role.",
             color=0x00FF00,
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -162,14 +162,14 @@ class RoleSelectionCog(commands.Cog):
                     break
 
             embed = create_embed(
-                title="🌩️ Choisis ton parcours",
+                title="🌩️ Choose Your Path",
                 description=(
-                    "Sélectionne ton rôle ci-dessous pour rejoindre le groupe correspondant.\n\n"
-                    "🎤 **Artist** — Production musicale, DJ, réseaux sociaux\n"
-                    "🤝 **Agent** — Booking, prospection, gestion\n"
-                    "🎓 **Student** — Cours, coaching, mentoring\n\n"
-                    "⚠️ **Artist** et **Agent** sont exclusifs.\n"
-                    "Tu peux ajouter **Student** en complément."
+                    "Select your role below to join the corresponding group.\n\n"
+                    "🎤 **Artist** — Music production, DJ, social media\n"
+                    "🤝 **Agent** — Booking, prospecting, management\n"
+                    "🎓 **Student** — Courses, coaching, mentoring\n\n"
+                    "⚠️ **Artist** and **Agent** are mutually exclusive.\n"
+                    "You can add **Student** as a complement."
                 ),
                 color=0xFFFFFF,
             )
@@ -190,13 +190,13 @@ class RoleSelectionCog(commands.Cog):
 
     @app_commands.command(
         name="refresh_roles",
-        description="Rafraîchit le message de sélection de rôles (staff only).",
+        description="Refreshes the role selection message (staff only).",
     )
     @app_commands.checks.has_permissions(manage_roles=True)
     async def refresh_roles(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
         await self._send_role_selection_message()
-        await interaction.followup.send("✅ Message de sélection de rôles rafraîchi.", ephemeral=True)
+        await interaction.followup.send("✅ Role selection message refreshed.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

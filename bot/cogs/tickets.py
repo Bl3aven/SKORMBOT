@@ -35,7 +35,7 @@ class OpenTicketView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="🎫 Ouvrir un ticket",
+        label="🎫 Open a Ticket",
         style=discord.ButtonStyle.secondary,
         custom_id="skorm:open-ticket",
     )
@@ -48,7 +48,7 @@ class OpenTicketView(discord.ui.View):
         cog: Optional[TicketsCog] = interaction.client.get_cog("TicketsCog")
         if cog is None:
             await interaction.followup.send(
-                "❌ Système de tickets indisponible.", ephemeral=True
+                "❌ Ticket system unavailable.", ephemeral=True
             )
             return
         await cog._create_ticket_for(interaction)
@@ -74,7 +74,7 @@ class TicketControlsView(discord.ui.View):
         member = interaction.user
         if not isinstance(member, discord.Member) or not check_staff_role(member):
             await interaction.followup.send(
-                "❌ Réservé au staff.", ephemeral=True
+                "❌ Staff only.", ephemeral=True
             )
             return
         cog: Optional[TicketsCog] = interaction.client.get_cog("TicketsCog")
@@ -83,18 +83,18 @@ class TicketControlsView(discord.ui.View):
         ticket = await db.get_ticket_by_channel(interaction.channel.id)
         if ticket is None:
             await interaction.followup.send(
-                "❌ Ticket introuvable.", ephemeral=True
+                "❌ Ticket not found.", ephemeral=True
             )
             return
         await db.claim_ticket(ticket["id"], member.id)
         await interaction.channel.send(
             embed=create_embed(
-                title="✅ Ticket claim",
-                description=f"Ce ticket est maintenant pris en charge par {member.mention}.",
+                title="✅ Ticket claimed",
+                description=f"This ticket is now being handled by {member.mention}.",
             )
         )
         await interaction.followup.send(
-            "Claim enregistré.", ephemeral=True
+            "Claim recorded.", ephemeral=True
         )
 
     @discord.ui.button(
@@ -111,7 +111,7 @@ class TicketControlsView(discord.ui.View):
         member = interaction.user
         if not isinstance(member, discord.Member) or not check_staff_role(member):
             await interaction.followup.send(
-                "❌ Réservé au staff.", ephemeral=True
+                "❌ Staff only.", ephemeral=True
             )
             return
         cog: Optional[TicketsCog] = interaction.client.get_cog("TicketsCog")
@@ -123,15 +123,15 @@ class TicketControlsView(discord.ui.View):
 # === Slash commands ===
 ticket_group = app_commands.Group(
     name="ticket",
-    description="Gestion des tickets de support.",
+    description="Support ticket management.",
 )
 
 
-@ticket_group.command(name="close", description="Ferme le ticket courant.")
+@ticket_group.command(name="close", description="Closes the current ticket.")
 async def ticket_close(interaction: discord.Interaction) -> None:
     if not isinstance(interaction.user, discord.Member) or not check_staff_role(interaction.user):
         await interaction.response.send_message(
-            "❌ Réservé au staff.", ephemeral=True
+            "❌ Staff only.", ephemeral=True
         )
         return
     cog: Optional[TicketsCog] = interaction.client.get_cog("TicketsCog")
@@ -141,11 +141,11 @@ async def ticket_close(interaction: discord.Interaction) -> None:
     await cog._close_ticket_channel(interaction.channel)
 
 
-@ticket_group.command(name="claim", description="Prend en charge le ticket.")
+@ticket_group.command(name="claim", description="Takes ownership of the ticket.")
 async def ticket_claim(interaction: discord.Interaction) -> None:
     if not isinstance(interaction.user, discord.Member) or not check_staff_role(interaction.user):
         await interaction.response.send_message(
-            "❌ Réservé au staff.", ephemeral=True
+            "❌ Staff only.", ephemeral=True
         )
         return
     cog: Optional[TicketsCog] = interaction.client.get_cog("TicketsCog")
@@ -154,30 +154,30 @@ async def ticket_claim(interaction: discord.Interaction) -> None:
     ticket = await db.get_ticket_by_channel(interaction.channel.id)
     if ticket is None:
         await interaction.response.send_message(
-            "❌ Ticket introuvable.", ephemeral=True
+            "❌ Ticket not found.", ephemeral=True
         )
         return
     await db.claim_ticket(ticket["id"], interaction.user.id)
     await interaction.response.send_message(
-        f"✅ Ticket claim par {interaction.user.mention}.",
+        f"✅ Ticket claimed by {interaction.user.mention}.",
     )
 
 
-@ticket_group.command(name="transfer", description="Ajoute un utilisateur au ticket.")
-@app_commands.describe(user="Utilisateur à ajouter au ticket")
+@ticket_group.command(name="transfer", description="Adds a user to the ticket.")
+@app_commands.describe(user="User to add to the ticket")
 async def ticket_transfer(
     interaction: discord.Interaction, user: discord.Member
 ) -> None:
     if not isinstance(interaction.user, discord.Member) or not check_staff_role(interaction.user):
         await interaction.response.send_message(
-            "❌ Réservé au staff.", ephemeral=True
+            "❌ Staff only.", ephemeral=True
         )
         return
     await interaction.channel.set_permissions(
         user, view_channel=True, send_messages=True, read_message_history=True,
     )
     await interaction.response.send_message(
-        f"✅ {user.mention} ajouté au ticket."
+        f"✅ {user.mention} added to the ticket."
     )
 
 
@@ -221,9 +221,9 @@ class TicketsCog(commands.Cog):
             embed = create_embed(
                 title=OPEN_TICKET_TITLE,
                 description=(
-                    "**Besoin d'aide ?**\n\n"
-                    "Clique sur le bouton ci-dessous pour ouvrir un ticket privé "
-                    "avec le staff. Notre équipe te répondra dans les meilleurs délais."
+                    "**Need help?**\n\n"
+                    "Click the button below to open a private ticket with "
+                    "staff. Our team will get back to you as soon as possible."
                 ),
             )
             try:
@@ -283,14 +283,14 @@ class TicketsCog(commands.Cog):
         member = interaction.user
         if guild is None or not isinstance(member, discord.Member):
             await interaction.followup.send(
-                "❌ Action indisponible.", ephemeral=True
+                "❌ Action unavailable.", ephemeral=True
             )
             return
 
         category = await self._get_or_create_category(guild)
         if category is None:
             await interaction.followup.send(
-                "❌ Impossible de créer la catégorie tickets.", ephemeral=True
+                "❌ Could not create tickets category.", ephemeral=True
             )
             return
 
@@ -316,7 +316,7 @@ class TicketsCog(commands.Cog):
                 continue
         if channel is None:
             await interaction.followup.send(
-                "❌ Impossible de créer le salon ticket.", ephemeral=True
+                "❌ Could not create ticket channel.", ephemeral=True
             )
             return
 
@@ -324,24 +324,24 @@ class TicketsCog(commands.Cog):
         embed = create_embed(
             title=f"Ticket #{ticket_id}",
             description=(
-                f"Bienvenue {member.mention}, un membre du staff va te répondre "
-                "rapidement.\n\n"
-                "Merci de décrire précisément ta demande."
+                f"Welcome {member.mention}, a staff member will respond "
+                "shortly.\n\n"
+                "Please describe your request in detail."
             ),
             fields=[
-                ("Statut", "🟢 Ouvert", True),
-                ("Créé le", datetime.utcnow().strftime("%d/%m/%Y %H:%M UTC"), True),
+                ("Status", "🟢 Open", True),
+                ("Created on", datetime.utcnow().strftime("%d/%m/%Y %H:%M UTC"), True),
             ],
         )
         await channel.send(embed=embed, view=TicketControlsView())
         await interaction.followup.send(
-            f"✅ Ticket créé : {channel.mention}", ephemeral=True
+            f"✅ Ticket created: {channel.mention}", ephemeral=True
         )
 
     async def _close_ticket_channel(self, channel: discord.TextChannel) -> None:
         ticket = await db.get_ticket_by_channel(channel.id)
         if ticket is None:
-            await channel.send("⚠️ Aucun ticket associé à ce salon.")
+            await channel.send("⚠️ No ticket associated with this channel.")
             return
 
         # Build transcript
@@ -371,11 +371,11 @@ class TicketsCog(commands.Cog):
                 )
                 await log_channel.send(
                     embed=create_embed(
-                        title=f"📕 Ticket #{ticket['id']} fermé",
+                        title=f"📕 Ticket #{ticket['id']} closed",
                         description=(
-                            f"**Salon** : {channel.name}\n"
-                            f"**Créateur** : <@{ticket['creator_id']}>\n"
-                            f"**Statut** : fermé"
+                            f"**Channel** : {channel.name}\n"
+                            f"**Creator** : <@{ticket['creator_id']}>\n"
+                            f"**Status** : closed"
                         ),
                     ),
                     file=file,
@@ -385,8 +385,8 @@ class TicketsCog(commands.Cog):
 
         await db.close_ticket(ticket["id"])
         await channel.send(embed=create_embed(
-            title="🔒 Ticket fermé",
-            description="Ce salon sera supprimé dans 5 secondes.",
+            title="🔒 Ticket closed",
+            description="This channel will be deleted in 5 seconds.",
         ))
         await asyncio.sleep(5)
         try:

@@ -138,8 +138,8 @@ def get_channel_by_name(guild: discord.Guild, name: str) -> discord.TextChannel 
 DIRECTION_ROLES = {"Founder", "CEO", "Creative Director", "Label Founder", "Admin"}
 STAFF_ROLES = {
     "Moderator", "Support",
-    "Coach Artistique", "Coach Production", "Coach DJ", "Coach Social Media",
-    "Formateur",
+    "Artistic Coach", "Production Coach", "DJ Coach", "Social Media Coach",
+    "Trainer",
 }
 
 

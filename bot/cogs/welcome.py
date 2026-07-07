@@ -43,10 +43,10 @@ class WelcomeCog(commands.Cog):
         if not rules_channel:
             return
 
-        # Try to find existing verification message (by bot, with Règlement title)
+        # Try to find existing verification message (by bot, with Rules title)
         try:
             async for msg in rules_channel.history(limit=50):
-                if msg.author == self.bot.user and msg.embeds and "Règlement" in msg.embeds[0].title:
+                if msg.author == self.bot.user and msg.embeds and "Rules" in msg.embeds[0].title:
                     self._verify_message_id = msg.id
                     # Ensure ✅ reaction is present
                     if not any(str(r.emoji) == VERIFY_EMOJI for r in msg.reactions):
@@ -59,11 +59,11 @@ class WelcomeCog(commands.Cog):
         # Create verification message if not found
         try:
             verify_embed = create_embed(
-                title="📖 Règlement SKORM",
+                title="📖 SKORM Rules",
                 description=(
-                    "Bienvenue sur **SKORM** !\n\n"
-                    "Pour accéder au serveur, réagis avec ✅ ci-dessous\n"
-                    "pour accepter le règlement."
+                    "Welcome to **SKORM** !\n\n"
+                    "To access the server, react with ✅ below\n"
+                    "to accept the rules."
                 ),
                 color=0xFFFFFF,
             )
@@ -85,10 +85,10 @@ class WelcomeCog(commands.Cog):
         if welcome_channel:
             try:
                 embed = create_embed(
-                    title=f"🌩️ Bienvenue sur SKORM, {member.display_name} !",
+                    title=f"🌩️ Welcome to SKORM, {member.display_name} !",
                     description=(
                         "**CREATE. CONNECT. DEVELOP.**\n\n"
-                        f"{member.mention} vient de rejoindre le serveur !"
+                        f"{member.mention} just joined the server !"
                     ),
                     color=0xFFFFFF,
                 )
@@ -99,17 +99,17 @@ class WelcomeCog(commands.Cog):
         # 2. Send DM with welcome + 2 tasks
         try:
             dm_embed = create_embed(
-                title="🌩️ Bienvenue chez SKORM !",
+                title="🌩️ Welcome to SKORM !",
                 description=(
                     "**CREATE. CONNECT. DEVELOP.**\n\n"
-                    "Tu viens de rejoindre le serveur officiel SKORM.\n\n"
-                    "Pour accéder au serveur, complète ces 2 étapes :\n\n"
-                    "1️⃣ **Accepte le règlement**\n"
-                    f"   Va dans <#{rules_channel.id}> et réagis avec ✅\n"
-                    if rules_channel else "   Va dans │rules et réagis avec ✅\n"
-                    "2️⃣ **Choisis ton rôle**\n"
-                    f"   Va dans <#{roles_channel.id}> et sélectionne ton parcours"
-                    if roles_channel else "   Va dans │claim-your-roles et sélectionne ton parcours",
+                    "You just joined the official SKORM server.\n\n"
+                    "To access the server, complete these 2 steps :\n\n"
+                    "1️⃣ **Accept the rules**\n"
+                    f"   Go to <#{rules_channel.id}> and react with ✅\n"
+                    if rules_channel else "   Go to │rules and react with ✅\n"
+                    "2️⃣ **Choose your role**\n"
+                    f"   Go to <#{roles_channel.id}> and select your path"
+                    if roles_channel else "   Go to │claim-your-roles and select your path",
                 ),
                 color=0xFFFFFF,
             )
@@ -188,12 +188,12 @@ class WelcomeCog(commands.Cog):
         roles_channel = get_channel_by_name(guild, ROLES_CHANNEL_NAME)
         try:
             confirm_embed = create_embed(
-                title="✅ Règlement accepté !",
+                title="✅ Rules accepted !",
                 description=(
-                    "Tu es maintenant vérifié sur SKORM.\n\n"
-                    "Il ne te reste plus qu'une étape :\n\n"
-                    f"🎭 **Choisis ton rôle** dans <#{roles_channel.id}>"
-                    if roles_channel else "🎭 Choisis ton rôle dans │claim-your-roles",
+                    "You are now verified on SKORM.\n\n"
+                    "One step remaining :\n\n"
+                    f"🎭 **Choose your role** in <#{roles_channel.id}>"
+                    if roles_channel else "🎭 Choose your role in │claim-your-roles",
                 ),
                 color=0x00FF00,
             )

@@ -152,7 +152,7 @@ class MusicCog(commands.Cog):
         # Check voice connection
         voice_channel = interaction.user.voice.channel if interaction.user.voice else None
         if not voice_channel:
-            await interaction.response.send_message("❌ Rejoins d'abord un salon vocal !", ephemeral=True)
+            await interaction.response.send_message("❌ Join a voice channel first !", ephemeral=True)
             return
 
         await interaction.response.defer()
@@ -161,7 +161,7 @@ class MusicCog(commands.Cog):
         try:
             player = await self._ensure_player(guild, voice_channel)
         except Exception as exc:
-            await interaction.followup.send(f"❌ Impossible de rejoindre le salon vocal : {exc}")
+            await interaction.followup.send(f"❌ Could not join voice channel: {exc}")
             return
 
         # Search for track
@@ -170,7 +170,7 @@ class MusicCog(commands.Cog):
         tracks = await pool.fetch_tracks(query_str)
 
         if not tracks:
-            await interaction.followup.send("❌ Aucun résultat trouvé.")
+            await interaction.followup.send("❌ No results found.")
             return
 
         track = tracks[0]
@@ -179,15 +179,15 @@ class MusicCog(commands.Cog):
         if player.playing:
             queue.put(track)
             await interaction.followup.send(
-                f"✅ Ajouté à la file :\n{format_track(track, queue.length)}"
+                f"✅ Added to queue:\n{format_track(track, queue.length)}"
             )
         else:
             await player.play(track)
             await interaction.followup.send(
-                f"🎵 En lecture :\n{format_track(track)}"
+                f"🎵 Now playing:\n{format_track(track)}"
             )
 
-    @app_commands.command(name="stop", description="Arrête la musique et vide la file d'attente")
+    @app_commands.command(name="stop", description="Stops music and clears the queue")
     async def stop(self, interaction: discord.Interaction) -> None:
         guild = interaction.guild
         if guild is None:
@@ -196,17 +196,17 @@ class MusicCog(commands.Cog):
         player = self._get_player(guild)
 
         if player is None or not player.connected:
-            await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
+            await interaction.response.send_message("❌ No music playing.", ephemeral=True)
             return
-            await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
+            await interaction.response.send_message("❌ No music playing.", ephemeral=True)
             return
 
         get_queue(guild.id).clear()
         await player.stop()
         await player.disconnect()
-        await interaction.response.send_message("🛑 Musique arrêtée et file d'attente vidée.")
+        await interaction.response.send_message("🛑 Music stopped and queue cleared.")
 
-    @app_commands.command(name="skip", description="Passe à la piste suivante")
+    @app_commands.command(name="skip", description="Skips to the next track")
     async def skip(self, interaction: discord.Interaction) -> None:
         guild = interaction.guild
         if guild is None:
@@ -215,13 +215,13 @@ class MusicCog(commands.Cog):
         player = self._get_player(guild)
 
         if player is None or not player.playing:
-            await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
+            await interaction.response.send_message("❌ No music playing.", ephemeral=True)
             return
 
         await player.skip()
-        await interaction.response.send_message("⏭ Piste suivante.")
+        await interaction.response.send_message("⏭ Next track.")
 
-    @app_commands.command(name="pause", description="Met en pause ou reprend la lecture")
+    @app_commands.command(name="pause", description="Pauses or resumes playback")
     async def pause(self, interaction: discord.Interaction) -> None:
         guild = interaction.guild
         if guild is None:
@@ -230,17 +230,17 @@ class MusicCog(commands.Cog):
         player = self._get_player(guild)
 
         if player is None or not player.connected:
-            await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
+            await interaction.response.send_message("❌ No music playing.", ephemeral=True)
             return
 
         if player.paused:
             await player.pause(False)
-            await interaction.response.send_message("▶ Lecture reprise.")
+            await interaction.response.send_message("▶ Playback resumed.")
         else:
             await player.pause(True)
-            await interaction.response.send_message("⏸ Lecture en pause.")
+            await interaction.response.send_message("⏸ Playback paused.")
 
-    @app_commands.command(name="queue", description="Affiche la file d'attente")
+    @app_commands.command(name="queue", description="Shows the queue")
     async def queue_cmd(self, interaction: discord.Interaction) -> None:
         guild = interaction.guild
         if guild is None:
@@ -250,29 +250,29 @@ class MusicCog(commands.Cog):
         queue = get_queue(guild.id)
 
         if player is None or (not player.playing and queue.is_empty):
-            await interaction.response.send_message("🎵 File d'attente vide. Utilise `/play <url>` pour commencer !", ephemeral=True)
+            await interaction.response.send_message("🎵 Queue is empty. Use `/play <url>` to start !", ephemeral=True)
             return
 
         lines = []
         if player and player.current:
-            lines.append(f"**🎵 En lecture :**\n{format_track(player.current, 0)}")
+            lines.append(f"**🎵 Now Playing:**\n{format_track(player.current, 0)}")
 
         for i, track in enumerate(queue._queue, start=1):
             lines.append(format_track(track, i))
 
         if not lines:
-            await interaction.response.send_message("🎵 File d'attente vide.")
+            await interaction.response.send_message("🎵 Queue is empty.")
             return
 
         description = "\n\n".join(lines)
         embed = create_embed(
-            title=f"🎵 File d'attente — {BRAND_NAME}",
+            title=f"🎵 Queue — {BRAND_NAME}",
             description=description[:4000],
         )
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="volume", description="Régle le volume (0-500)")
-    @app_commands.describe(level="Volume de 0 à 500 (100 = normal)")
+    @app_commands.command(name="volume", description="Sets the volume (0-500)")
+    @app_commands.describe(level="Volume from 0 to 500 (100 = normal)")
     async def volume(self, interaction: discord.Interaction, level: int) -> None:
         guild = interaction.guild
         if guild is None:
@@ -281,14 +281,14 @@ class MusicCog(commands.Cog):
         player = self._get_player(guild)
 
         if player is None or not player.connected:
-            await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
+            await interaction.response.send_message("❌ No music playing.", ephemeral=True)
             return
 
         level = max(0, min(500, level))
         await player.set_volume(level)
-        await interaction.response.send_message(f"🔊 Volume réglé à {level}%.")
+        await interaction.response.send_message(f"🔊 Volume set to {level}%.")
 
-    @app_commands.command(name="nowplaying", description="Affiche la piste en cours")
+    @app_commands.command(name="nowplaying", description="Shows the current track")
     async def nowplaying(self, interaction: discord.Interaction) -> None:
         guild = interaction.guild
         if guild is None:
@@ -297,7 +297,7 @@ class MusicCog(commands.Cog):
         player = self._get_player(guild)
 
         if player is None or player.current is None:
-            await interaction.response.send_message("🎵 Aucune musique en cours de lecture.", ephemeral=True)
+            await interaction.response.send_message("🎵 No music currently playing.", ephemeral=True)
             return
 
         track = player.current
@@ -318,7 +318,7 @@ class MusicCog(commands.Cog):
 
         bar = _progress_bar(progress, duration)
         embed = create_embed(
-            title=f"🎵 En lecture",
+            title=f"🎵 Now Playing",
             description=(
                 f"[**{track.title}**]({track.uri}) — {track.author}\n\n"
                 f"{bar} `{_fmt(progress)}` / `{_fmt(duration)}`"

@@ -103,10 +103,10 @@ class AntiSpamCog(commands.Cog):
                 try:
                     await message.author.send(
                         embed=create_embed(
-                            title="⛔ Spam de mentions",
+                            title="⛔ Mention Spam",
                             description=(
-                                "Les mentions massives (@everyone/@here) sont "
-                                "limitées. Réessaye plus tard."
+                                "Mass mentions (@everyone/@here) are "
+                                "limited. Try again later."
                             ),
                         )
                     )
@@ -130,12 +130,12 @@ class AntiSpamCog(commands.Cog):
             await self._warn_staff(
                 message.guild,
                 create_embed(
-                    title="🚨 Anti-spam déclenché",
+                    title="🚨 Anti-spam triggered",
                     description=(
-                        f"**Membre** : {message.author.mention} (`{user_id}`)\n"
-                        f"**Salon** : {message.channel.mention}\n"
-                        f"Timeout de {self.MESSAGE_TIMEOUT_SECONDS // 60} min appliqué.\n"
-                        f"{len(queue)} messages en {self.MESSAGE_WINDOW:.0f}s."
+                        f"**Member** : {message.author.mention} (`{user_id}`)\n"
+                        f"**Channel** : {message.channel.mention}\n"
+                        f"{self.MESSAGE_TIMEOUT_SECONDS // 60} min timeout applied.\n"
+                        f"{len(queue)} messages in {self.MESSAGE_WINDOW:.0f}s."
                     ),
                 ),
             )
@@ -150,11 +150,11 @@ class AntiSpamCog(commands.Cog):
             await self._warn_staff(
                 member.guild,
                 create_embed(
-                    title="⚠️ Pic de joins détecté",
+                    title="⚠️ Join spike detected",
                     description=(
-                        f"{len(self._joins)} joins en {self.JOIN_WINDOW:.0f}s.\n"
-                        "Surveillez les arrivées et activez le mode vérification "
-                        "si nécessaire."
+                        f"{len(self._joins)} joins in {self.JOIN_WINDOW:.0f}s.\n"
+                        "Monitor new arrivals and enable verification mode "
+                        "if needed."
                     ),
                 ),
             )

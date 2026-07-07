@@ -14,7 +14,7 @@ log = logging.getLogger("skorm.autoroles")
 
 
 ROLES_CHANNEL_NAME = "│claim-your-roles"
-SENTINEL_MESSAGE_TITLE = "🎭 Choisis tes rôles"
+SENTINEL_MESSAGE_TITLE = "🎭 Choose Your Roles"
 
 
 # Maps an emoji to the role name that should be toggled
@@ -62,8 +62,8 @@ class AutoRolesCog(commands.Cog):
                     break
 
             description_lines = [
-                "**Réagis ci-dessous pour obtenir tes rôles.**",
-                "Tu peux retirer une réaction pour enlever un rôle.",
+                "**React below to get your roles.**",
+                "You can remove a reaction to remove a role.",
                 "",
                 "🎤 — Artist",
                 "🤝 — Agent",

@@ -21,18 +21,18 @@ EVENTS_CHANNEL_NAME = "│events"
 
 remind_group = app_commands.Group(
     name="remind",
-    description="Gestion des rappels personnels.",
+    description="Personal reminder management.",
 )
 event_group = app_commands.Group(
     name="event",
-    description="Gestion des événements du serveur.",
+    description="Server event management.",
 )
 
 
-@remind_group.command(name="set", description="Programme un rappel.")
+@remind_group.command(name="set", description="Sets a reminder.")
 @app_commands.describe(
-    message="Texte du rappel",
-    duration="Durée (ex: 30m, 2h, 1d, 2 days)",
+    message="Reminder text",
+    duration="Duration (e.g., 30m, 2h, 1d, 2 days)",
 )
 async def remind_set(
     interaction: discord.Interaction,
@@ -42,13 +42,13 @@ async def remind_set(
     seconds = parse_duration(duration)
     if seconds is None or seconds <= 0:
         await interaction.response.send_message(
-            "❌ Format de durée invalide. Exemples : `30m`, `2h`, `1d`, `2 hours`.",
+            "❌ Invalid duration format. Examples: `30m`, `2h`, `1d`, `2 hours`.",
             ephemeral=True,
         )
         return
     if seconds > 60 * 60 * 24 * 365:
         await interaction.response.send_message(
-            "❌ Durée maximale : 1 an.", ephemeral=True
+            "❌ Maximum duration: 1 year.", ephemeral=True
         )
         return
 
@@ -56,22 +56,22 @@ async def remind_set(
     reminder_id = await db.add_reminder(interaction.user.id, message, remind_at)
 
     embed = create_embed(
-        title="⏰ Rappel programmé",
+        title="⏰ Reminder scheduled",
         description=(
             f"**ID** : `{reminder_id}`\n"
-            f"**Dans** : {format_duration(seconds)}\n"
-            f"**Rappel** : {message}"
+            f"**In** : {format_duration(seconds)}\n"
+            f"**Reminder** : {message}"
         ),
     )
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-@remind_group.command(name="list", description="Liste tes rappels actifs.")
+@remind_group.command(name="list", description="Lists your active reminders.")
 async def remind_list(interaction: discord.Interaction) -> None:
     rows = await db.list_active_reminders(interaction.user.id)
     if not rows:
         await interaction.response.send_message(
-            "Aucun rappel actif.", ephemeral=True
+            "No active reminders.", ephemeral=True
         )
         return
     lines = []
@@ -84,15 +84,15 @@ async def remind_list(interaction: discord.Interaction) -> None:
         )
     await interaction.response.send_message(
         embed=create_embed(
-            title="⏰ Tes rappels actifs",
+            title="⏰ Your active reminders",
             description="\n".join(lines)[:2000],
         ),
         ephemeral=True,
     )
 
 
-@remind_group.command(name="delete", description="Supprime un rappel actif.")
-@app_commands.describe(reminder_id="ID du rappel à supprimer")
+@remind_group.command(name="delete", description="Deletes an active reminder.")
+@app_commands.describe(reminder_id="ID of the reminder to delete")
 async def remind_delete(
     interaction: discord.Interaction,
     reminder_id: int,
@@ -100,18 +100,18 @@ async def remind_delete(
     deleted = await db.delete_reminder(reminder_id, interaction.user.id)
     if deleted:
         await interaction.response.send_message(
-            f"✅ Rappel `{reminder_id}` supprimé.", ephemeral=True
+            f"✅ Reminder `{reminder_id}` deleted.", ephemeral=True
         )
     else:
         await interaction.response.send_message(
-            f"❌ Rappel `{reminder_id}` introuvable.", ephemeral=True
+            f"❌ Reminder `{reminder_id}` not found.", ephemeral=True
         )
 
 
-@event_group.command(name="create", description="Crée un événement Discord.")
+@event_group.command(name="create", description="Creates a Discord event.")
 @app_commands.describe(
-    name="Nom de l'événement",
-    date="Date au format YYYY-MM-DD HH:MM (UTC)",
+    name="Event name",
+    date="Date in YYYY-MM-DD HH:MM format (UTC)",
 )
 async def event_create(
     interaction: discord.Interaction,
@@ -126,14 +126,14 @@ async def event_create(
             event_time = datetime.fromisoformat(date)
         except ValueError:
             await interaction.response.send_message(
-                "❌ Format de date invalide. Utilise `YYYY-MM-DD HH:MM` (UTC).",
+                "❌ Invalid date format. Use `YYYY-MM-DD HH:MM` (UTC).",
                 ephemeral=True,
             )
             return
 
     if event_time < datetime.utcnow():
         await interaction.response.send_message(
-            "❌ La date doit être dans le futur.", ephemeral=True
+            "❌ Date must be in the future.", ephemeral=True
         )
         return
 
@@ -154,11 +154,11 @@ async def event_create(
         log.warning("Could not create Discord scheduled event: %s", exc)
 
     embed = create_embed(
-        title=f"📅 Événement créé — #{event_id}",
+        title=f"📅 Event created — #{event_id}",
         description=(
-            f"**Nom** : {name}\n"
+            f"**Name** : {name}\n"
             f"**Date** : {event_time.strftime('%d/%m/%Y %H:%M UTC')}\n"
-            f"Notifications automatiques H-24 et H-1."
+            f"Automatic notifications at H-24 and H-1."
         ),
     )
     await interaction.response.send_message(embed=embed)
@@ -193,7 +193,7 @@ class RemindersCog(commands.Cog):
             try:
                 user = self.bot.get_user(row["user_id"])
                 embed = create_embed(
-                    title="⏰ Rappel",
+                    title="⏰ Reminder",
                     description=row["message"],
                 )
                 if user is None:

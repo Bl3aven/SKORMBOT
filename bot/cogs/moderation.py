@@ -70,10 +70,10 @@ class ModerationCog(commands.Cog):
             try:
                 await message.channel.send(
                     embed=create_embed(
-                        title="🔗 Lien suspect supprimé",
+                        title="🔗 Suspicious link deleted",
                         description=(
-                            f"{message.author.mention}, les raccourcisseurs de "
-                            "liens ne sont pas autorisés sur ce serveur."
+                            f"{message.author.mention}, URL shorteners are "
+                            "not allowed on this server."
                         ),
                     ),
                     delete_after=8.0,
@@ -85,7 +85,7 @@ class ModerationCog(commands.Cog):
             if logging_cog:
                 await logging_cog.log_action(
                     guild=message.guild,
-                    action="Lien suspect supprimé",
+                    action="Suspicious link deleted",
                     user=message.author,
                     channel=message.channel,
                     reason=message.content[:256] or None,
@@ -94,11 +94,11 @@ class ModerationCog(commands.Cog):
     # --- Slash commands ---
     mod_group = app_commands.Group(
         name="mod",
-        description="Commandes de modération.",
+        description="Moderation commands.",
     )
 
-    @mod_group.command(name="warn", description="Avertit un membre.")
-    @app_commands.describe(user="Membre à avertir", reason="Raison")
+    @mod_group.command(name="warn", description="Warns a member.")
+    @app_commands.describe(user="Member to warn", reason="Reason")
     async def warn(
         self,
         interaction: discord.Interaction,
@@ -107,12 +107,12 @@ class ModerationCog(commands.Cog):
     ) -> None:
         if not isinstance(interaction.user, discord.Member) or not self._user_can_warn(interaction.user):
             await interaction.response.send_message(
-                "❌ Réservé au staff.", ephemeral=True
+                "❌ Staff only.", ephemeral=True
             )
             return
         if user.bot:
             await interaction.response.send_message(
-                "❌ Impossible d'avertir un bot.", ephemeral=True
+                "❌ Can't warn a bot.", ephemeral=True
             )
             return
 
@@ -131,24 +131,24 @@ class ModerationCog(commands.Cog):
                 pass
 
         embed = create_embed(
-            title=f"⚠️ Avertissement #{warn_id}",
+            title=f"⚠️ Warning #{warn_id}",
             description=(
-                f"**Membre** : {user.mention}\n"
-                f"**Raison** : {reason}\n"
-                f"**Total** : {count} avertissement(s)"
-                + ("\n**⏱️ Timeout automatique de 10 min appliqué.**" if auto_muted else "")
+                f"**Member** : {user.mention}\n"
+                f"**Reason** : {reason}\n"
+                f"**Total** : {count} warning(s)"
+                + ("\n**⏱️ 10-minute auto timeout applied.**" if auto_muted else "")
             ),
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
 
         # DM the user
         try:
-            warning_msg = "Un timeout de 10 minutes vient d'être appliqué." if auto_muted else "À partir de 3 avertissements, un timeout est appliqué."
+            warning_msg = "A 10-minute timeout has just been applied." if auto_muted else "After 3 warnings, a timeout is applied."
             await user.send(embed=create_embed(
-                title=f"⚠️ Tu as reçu un avertissement sur {interaction.guild.name}",
+                title=f"⚠️ You received a warning on {interaction.guild.name}",
                 description=(
-                    f"**Raison** : {reason}\n"
-                    f"Tu as maintenant **{count}** avertissement(s).\n"
+                    f"**Reason** : {reason}\n"
+                    f"You now have **{count}** warning(s).\n"
                     f"{warning_msg}"
                 ),
             ))
@@ -160,18 +160,18 @@ class ModerationCog(commands.Cog):
         if logging_cog:
             await logging_cog.log_action(
                 guild=interaction.guild,
-                action="Avertissement",
+                action="Warning",
                 user=user,
                 moderator=interaction.user,
                 reason=reason,
                 extra_fields=[("Total", f"{count}", True)],
             )
 
-    @mod_group.command(name="mute", description="Met un membre en timeout.")
+    @mod_group.command(name="mute", description="Puts a member in timeout.")
     @app_commands.describe(
-        user="Membre à mute",
-        duration="Durée (ex: 10m, 1h, 2h)",
-        reason="Raison",
+        user="Member to mute",
+        duration="Duration (e.g., 10m, 1h, 2h)",
+        reason="Reason",
     )
     async def mute(
         self,
@@ -182,13 +182,13 @@ class ModerationCog(commands.Cog):
     ) -> None:
         if not isinstance(interaction.user, discord.Member) or not self._user_can_warn(interaction.user):
             await interaction.response.send_message(
-                "❌ Réservé au staff.", ephemeral=True
+                "❌ Staff only.", ephemeral=True
             )
             return
         seconds = parse_duration(duration)
         if seconds is None or seconds < 60 or seconds > 86400:
             await interaction.response.send_message(
-                "❌ Durée invalide (entre 1 min et 24h).", ephemeral=True
+                "❌ Invalid duration (between 1 min and 24h).", ephemeral=True
             )
             return
 
@@ -197,18 +197,18 @@ class ModerationCog(commands.Cog):
             await user.timeout(until, reason=f"Mute: {reason}")
         except discord.Forbidden:
             await interaction.response.send_message(
-                "❌ Permissions insuffisantes pour mute ce membre.",
+                "❌ Insufficient permissions to mute this member.",
                 ephemeral=True,
             )
             return
 
         await interaction.response.send_message(
             embed=create_embed(
-                title="🔇 Membre mute",
+                title="🔇 Member muted",
                 description=(
-                    f"**Membre** : {user.mention}\n"
-                    f"**Durée** : {format_duration(seconds)}\n"
-                    f"**Raison** : {reason}"
+                    f"**Member** : {user.mention}\n"
+                    f"**Duration** : {format_duration(seconds)}\n"
+                    f"**Reason** : {reason}"
                 ),
             )
         )
@@ -221,65 +221,65 @@ class ModerationCog(commands.Cog):
                 user=user,
                 moderator=interaction.user,
                 reason=reason,
-                extra_fields=[("Durée", format_duration(seconds), True)],
+                extra_fields=[("Duration", format_duration(seconds), True)],
             )
 
-    @mod_group.command(name="unmute", description="Retire le timeout d'un membre.")
-    @app_commands.describe(user="Membre à unmute")
+    @mod_group.command(name="unmute", description="Removes timeout from a member.")
+    @app_commands.describe(user="Member to unmute")
     async def unmute(
         self, interaction: discord.Interaction, user: discord.Member
     ) -> None:
         if not isinstance(interaction.user, discord.Member) or not self._user_can_warn(interaction.user):
             await interaction.response.send_message(
-                "❌ Réservé au staff.", ephemeral=True
+                "❌ Staff only.", ephemeral=True
             )
             return
         try:
             await user.timeout(None, reason="Unmute")
         except discord.Forbidden:
             await interaction.response.send_message(
-                "❌ Permissions insuffisantes.", ephemeral=True
+                "❌ Insufficient permissions.", ephemeral=True
             )
             return
         await interaction.response.send_message(
             embed=create_embed(
-                title="🔊 Membre unmute",
-                description=f"{user.mention} peut à nouveau parler.",
+                title="🔊 Member unmuted",
+                description=f"{user.mention} can speak again.",
             )
         )
         logging_cog = interaction.client.get_cog("LoggingCog")
         if logging_cog:
             await logging_cog.log_action(
                 guild=interaction.guild,
-                action="Timeout retiré",
+                action="Timeout removed",
                 user=user,
                 moderator=interaction.user,
             )
 
-    @mod_group.command(name="kick", description="Exclut un membre.")
-    @app_commands.describe(user="Membre à exclure", reason="Raison")
+    @mod_group.command(name="kick", description="Kicks a member.")
+    @app_commands.describe(user="Member to kick", reason="Reason")
     async def kick(
         self,
         interaction: discord.Interaction,
         user: discord.Member,
-        reason: str = "Non précisée",
+        reason: str = "Not specified",
     ) -> None:
         if not isinstance(interaction.user, discord.Member) or not self._user_can_kick_ban(interaction.user):
             await interaction.response.send_message(
-                "❌ Réservé à la Direction.", ephemeral=True
+                "❌ Management only.", ephemeral=True
             )
             return
         try:
             await user.kick(reason=f"Kick: {reason}")
         except discord.Forbidden:
             await interaction.response.send_message(
-                "❌ Permissions insuffisantes.", ephemeral=True
+                "❌ Insufficient permissions.", ephemeral=True
             )
             return
         await interaction.response.send_message(
             embed=create_embed(
-                title="👢 Membre exclu",
-                description=f"**Membre** : {user.mention}\n**Raison** : {reason}",
+                title="👢 Member kicked",
+                description=f"**Member** : {user.mention}\n**Reason** : {reason}",
             )
         )
         logging_cog = interaction.client.get_cog("LoggingCog")
@@ -292,30 +292,30 @@ class ModerationCog(commands.Cog):
                 reason=reason,
             )
 
-    @mod_group.command(name="ban", description="Bannit un membre.")
-    @app_commands.describe(user="Membre à bannir", reason="Raison")
+    @mod_group.command(name="ban", description="Bans a member.")
+    @app_commands.describe(user="Member to ban", reason="Reason")
     async def ban(
         self,
         interaction: discord.Interaction,
         user: discord.Member,
-        reason: str = "Non précisée",
+        reason: str = "Not specified",
     ) -> None:
         if not isinstance(interaction.user, discord.Member) or not self._user_can_kick_ban(interaction.user):
             await interaction.response.send_message(
-                "❌ Réservé à la Direction.", ephemeral=True
+                "❌ Management only.", ephemeral=True
             )
             return
         try:
             await user.ban(reason=f"Ban: {reason}")
         except discord.Forbidden:
             await interaction.response.send_message(
-                "❌ Permissions insuffisantes.", ephemeral=True
+                "❌ Insufficient permissions.", ephemeral=True
             )
             return
         await interaction.response.send_message(
             embed=create_embed(
-                title="⛔ Membre banni",
-                description=f"**Membre** : {user.mention}\n**Raison** : {reason}",
+                title="⛔ Member banned",
+                description=f"**Member** : {user.mention}\n**Reason** : {reason}",
             )
         )
         logging_cog = interaction.client.get_cog("LoggingCog")
@@ -328,22 +328,22 @@ class ModerationCog(commands.Cog):
                 reason=reason,
             )
 
-    @mod_group.command(name="warnings", description="Affiche les avertissements d'un membre.")
-    @app_commands.describe(user="Membre ciblé")
+    @mod_group.command(name="warnings", description="Shows a member's warnings.")
+    @app_commands.describe(user="Target member")
     async def warnings(
         self, interaction: discord.Interaction, user: discord.Member
     ) -> None:
         if not isinstance(interaction.user, discord.Member) or not self._user_can_warn(interaction.user):
             await interaction.response.send_message(
-                "❌ Réservé au staff.", ephemeral=True
+                "❌ Staff only.", ephemeral=True
             )
             return
-        rows = await db.get_warnings(user.id)
+        rows = await db.list_warnings(user.id)
         if not rows:
             await interaction.response.send_message(
                 embed=create_embed(
-                    title=f"⚠️ Avertissements de {user.display_name}",
-                    description="Aucun avertissement.",
+                    title=f"⚠️ Warnings for {user.display_name}",
+                    description="No warnings.",
                 ),
                 ephemeral=True,
             )
