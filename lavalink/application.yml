@@ -7,7 +7,6 @@ lavalink:
   server:
     password: skorm
     sources:
-      - youtube
       - soundcloud
       - bandcamp
       - twitch
@@ -22,10 +21,12 @@ lavalink:
     useSeekGetters: true
     youtubePlaylistLoadLimit: 10
     playerUpdateInterval: 5
-    youtubeSearchEnabled: true
+    youtubeSearchEnabled: false
     soundcloudSearchEnabled: true
   plugins:
     - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.3"
+      repository: "https://maven.lavalink.dev/releases"
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.10.2"
       repository: "https://maven.lavalink.dev/releases"
 
 plugins:
