@@ -154,7 +154,12 @@ class MusicCog(commands.Cog):
                 is_paused = player.paused
                 volume = player.volume if hasattr(player, 'volume') else 100
             if player.connected:
-                voice_channel_id = player.voice_channel.id if player.voice_channel else None
+                # Find voice channel from guild
+                guild = self.bot.get_guild(guild_id)
+                if guild:
+                    vc = guild.voice_channels and next((v for v in guild.voice_channels if v.me), None)
+                    if vc:
+                        voice_channel_id = vc.id
 
         # Serialize queue
         queue_data = [self._serialize_track(t) for t in queue._queue]
