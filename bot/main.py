@@ -56,7 +56,18 @@ async def load_cogs() -> None:
             log.error("Failed to load cog %s: %s", ext, exc)
             traceback.print_exc()
 
-    # Connect to Lavalink
+
+@bot.event
+async def on_ready() -> None:
+    log.info("=" * 60)
+    log.info("%s bot online as %s (id=%s)", BRAND_NAME, bot.user, bot.user.id)
+    log.info("Tagline: %s", BRAND_TAGLINE)
+    log.info("Connected to %d guild(s):", len(bot.guilds))
+    for guild in bot.guilds:
+        log.info("  - %s (id=%s, members=%d)", guild.name, guild.id, guild.member_count)
+    log.info("=" * 60)
+
+    # Connect to Lavalink (must be after on_ready so bot.user is available)
     try:
         pool = wavelink.Pool()
         await pool.connect(
@@ -74,17 +85,6 @@ async def load_cogs() -> None:
     except Exception as exc:
         log.error("Failed to connect to Lavalink: %s", exc)
         bot.wavelink = None
-
-
-@bot.event
-async def on_ready() -> None:
-    log.info("=" * 60)
-    log.info("%s bot online as %s (id=%s)", BRAND_NAME, bot.user, bot.user.id)
-    log.info("Tagline: %s", BRAND_TAGLINE)
-    log.info("Connected to %d guild(s):", len(bot.guilds))
-    for guild in bot.guilds:
-        log.info("  - %s (id=%s, members=%d)", guild.name, guild.id, guild.member_count)
-    log.info("=" * 60)
 
     # Initialise database
     try:
