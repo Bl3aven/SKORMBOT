@@ -36,6 +36,7 @@ class MusicQueue:
         self.guild_id = guild_id
         self._queue: list[wavelink.Playable] = []
         self._history: list[wavelink.Playable] = []
+        self.voice_channel_id: int | None = None  # Track connected voice channel
 
     @property
     def is_empty(self) -> bool:
@@ -145,7 +146,7 @@ class MusicCog(commands.Cog):
         position = 0
         is_paused = False
         volume = 100
-        voice_channel_id = None
+        voice_channel_id = queue.voice_channel_id
 
         if player:
             if player.current:
@@ -153,13 +154,6 @@ class MusicCog(commands.Cog):
                 position = player.position if hasattr(player, 'position') else 0
                 is_paused = player.paused
                 volume = player.volume if hasattr(player, 'volume') else 100
-            if player.connected:
-                # Find voice channel from guild
-                guild = self.bot.get_guild(guild_id)
-                if guild:
-                    vc = guild.voice_channels and next((v for v in guild.voice_channels if v.me), None)
-                    if vc:
-                        voice_channel_id = vc.id
 
         # Serialize queue
         queue_data = [self._serialize_track(t) for t in queue._queue]
