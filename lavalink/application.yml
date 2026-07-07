@@ -24,7 +24,15 @@ lavalink:
     playerUpdateInterval: 5
     youtubeSearchEnabled: true
     soundcloudSearchEnabled: true
+  plugins:
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.0.8"
+      repository: "https://maven.lavalink.dev/releases"
 
-spotify:
-  clientId: "8135bad63143448190f458e0587ba33f"
-  clientSecret: "76e07ab4ac2d4e13a37ff561d9d5febd"
+lavasrc:
+  providers:
+    - "spsearch:%ISRC%"
+    - "ytsearch:%QUERY%"
+  sources:
+    spotify:
+      clientId: "8135bad63143448190f458e0587ba33f"
+      clientSecret: "76e07ab4ac2d4e13a37ff561d9d5febd"
