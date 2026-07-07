@@ -117,7 +117,6 @@ class WelcomeCog(commands.Cog):
             return
 
         verified_role = get_role_by_name(guild, "Verified")
-        community_role = get_role_by_name(guild, "Community")
 
         if verified_role is None:
             try:
@@ -129,10 +128,7 @@ class WelcomeCog(commands.Cog):
             return
 
         try:
-            roles_to_add = [verified_role]
-            if community_role is not None and community_role not in member.roles:
-                roles_to_add.append(community_role)
-            await member.add_roles(*roles_to_add, reason="SKORM verification (reaction)")
+            await member.add_roles(verified_role, reason="SKORM verification (reaction)")
         except discord.Forbidden:
             return
         except Exception as exc:
