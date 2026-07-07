@@ -59,7 +59,7 @@ async def load_cogs() -> None:
     # Connect to Lavalink
     try:
         pool = wavelink.Pool()
-        pool.connect(
+        await pool.connect(
             nodes=[
                 wavelink.Node(
                     uri=f"http://{LAVALINK_HOST}:{LAVALINK_PORT}",

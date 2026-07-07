@@ -95,7 +95,7 @@ class MusicCog(commands.Cog):
 
     # --- Wavelink 3.x events (dispatched as on_wavelink_*) ---
 
-    @commands.bot_listener()
+    @commands.listen("on_wavelink_track_end")
     async def on_wavelink_track_end(self, payload: wavelink.TrackEndEventPayload) -> None:
         """Play next track from queue when current track ends."""
         player = payload.player
@@ -110,11 +110,11 @@ class MusicCog(commands.Cog):
         if next_track:
             await player.play(next_track)
 
-    @commands.bot_listener()
+    @commands.listen("on_wavelink_track_stuck")
     async def on_wavelink_track_stuck(self, payload: wavelink.TrackStuckEventPayload) -> None:
         log.warning("Track stuck: %s", payload.track.title)
 
-    @commands.bot_listener()
+    @commands.listen("on_wavelink_track_exception")
     async def on_wavelink_track_exception(self, payload: wavelink.TrackExceptionEventPayload) -> None:
         log.error("Lavalink track exception: %s", payload.exception)
 
