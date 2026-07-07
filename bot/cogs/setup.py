@@ -501,6 +501,25 @@ class SetupCog(commands.Cog):
                     log.error("Failed to create voice %s: %s", channel_name, exc)
                     report["errors"].append(f"voice:{channel_name}: {exc}")
 
+    async def _sync_category_channels(
+        self,
+        category: discord.CategoryChannel,
+        overwrites: dict,
+    ) -> None:
+        """Apply category overwrites to all existing channels in the category."""
+        for channel in category.channels:
+            try:
+                # Merge category overwrites with channel-specific overwrites
+                ch_overwrites = dict(overwrites)
+                # Keep existing channel-specific overwrites that differ from category
+                for target, overwrite in channel.overwrites.items():
+                    if target not in ch_overwrites:
+                        ch_overwrites[target] = overwrite
+                await channel.edit(overwrites=ch_overwrites, reason="SKORM - sync category perms")
+                await asyncio.sleep(0.2)
+            except Exception as exc:
+                log.warning("Failed to sync perms for channel %s: %s", channel.name, exc)
+
     async def _apply_permissions(
         self,
         guild: discord.Guild,
@@ -557,19 +576,8 @@ class SetupCog(commands.Cog):
                 await accueil.edit(overwrites=accueil_overwrites)
                 await asyncio.sleep(0.3)
 
-                # Apply overwrites to ALL existing channels in the category
-                for channel in accueil.channels:
-                    try:
-                        # Merge category overwrites with channel-specific overwrites
-                        ch_overwrites = dict(accueil_overwrites)
-                        # Keep existing channel-specific overwrites that differ from category
-                        for target, overwrite in channel.overwrites.items():
-                            if target not in ch_overwrites:
-                                ch_overwrites[target] = overwrite
-                        await channel.edit(overwrites=ch_overwrites, reason="SKORM - sync category perms")
-                        await asyncio.sleep(0.2)
-                    except Exception as exc:
-                        log.warning("Failed to sync perms for channel %s: %s", channel.name, exc)
+                # Sync to all existing channels
+                await self._sync_category_channels(accueil, accueil_overwrites)
 
                 # │rules is the ONLY channel visible to everyone (pre-verification)
                 rules_channel = next(
@@ -592,8 +600,10 @@ class SetupCog(commands.Cog):
         if artistes:
             try:
                 artist_roles = ["Artist"] + list(COACH_ROLES) + list(DIRECTION_ROLES)
-                await artistes.edit(overwrites=allow_roles(*artist_roles))
+                artist_overwrites = allow_roles(*artist_roles)
+                await artistes.edit(overwrites=artist_overwrites)
                 await asyncio.sleep(0.3)
+                await self._sync_category_channels(artistes, artist_overwrites)
             except Exception as exc:
                 log.error("Failed to set perms for Artistes: %s", exc)
 
@@ -602,8 +612,10 @@ class SetupCog(commands.Cog):
         if agents:
             try:
                 agent_roles = ["Agent"] + list(DIRECTION_ROLES)
-                await agents.edit(overwrites=allow_roles(*agent_roles))
+                agent_overwrites = allow_roles(*agent_roles)
+                await agents.edit(overwrites=agent_overwrites)
                 await asyncio.sleep(0.3)
+                await self._sync_category_channels(agents, agent_overwrites)
             except Exception as exc:
                 log.error("Failed to set perms for Agents: %s", exc)
 
@@ -616,8 +628,10 @@ class SetupCog(commands.Cog):
                     + list(DIRECTION_ROLES)
                     + list(FORMATION_ROLES)
                 )
-                await formations.edit(overwrites=allow_roles(*formation_allow))
+                formation_overwrites = allow_roles(*formation_allow)
+                await formations.edit(overwrites=formation_overwrites)
                 await asyncio.sleep(0.3)
+                await self._sync_category_channels(formations, formation_overwrites)
             except Exception as exc:
                 log.error("Failed to set perms for Formations: %s", exc)
 
@@ -626,8 +640,10 @@ class SetupCog(commands.Cog):
         if staff:
             try:
                 staff_roles = list(STAFF_ROLES) + list(DIRECTION_ROLES)
-                await staff.edit(overwrites=allow_roles(*staff_roles))
+                staff_overwrites = allow_roles(*staff_roles)
+                await staff.edit(overwrites=staff_overwrites)
                 await asyncio.sleep(0.3)
+                await self._sync_category_channels(staff, staff_overwrites)
             except Exception as exc:
                 log.error("Failed to set perms for Staff: %s", exc)
 
@@ -650,6 +666,7 @@ class SetupCog(commands.Cog):
                         )
                 await logs_cat.edit(overwrites=ow)
                 await asyncio.sleep(0.3)
+                await self._sync_category_channels(logs_cat, ow)
             except Exception as exc:
                 log.error("Failed to set perms for Logs: %s", exc)
 
