@@ -26,11 +26,12 @@ log = logging.getLogger("skorm.music")
 
 
 class MusicQueue:
-    """Per-guild music queue wrapper."""
+    """Per-guild music queue wrapper with history support."""
 
     def __init__(self, guild_id: int):
         self.guild_id = guild_id
         self._queue: list[wavelink.Playable] = []
+        self._history: list[wavelink.Playable] = []
 
     @property
     def is_empty(self) -> bool:
@@ -39,6 +40,10 @@ class MusicQueue:
     @property
     def length(self) -> int:
         return len(self._queue)
+
+    @property
+    def history_length(self) -> int:
+        return len(self._history)
 
     def put(self, track: wavelink.Playable) -> None:
         self._queue.append(track)
@@ -50,10 +55,22 @@ class MusicQueue:
 
     def clear(self) -> None:
         self._queue.clear()
+        self._history.clear()
 
     def peek(self) -> Optional[wavelink.Playable]:
         if self._queue:
             return self._queue[0]
+        return None
+
+    def push_history(self, track: wavelink.Playable) -> None:
+        """Add a track to history (most recent first, max 50)."""
+        self._history.insert(0, track)
+        if len(self._history) > 50:
+            self._history.pop()
+
+    def get_previous(self) -> Optional[wavelink.Playable]:
+        if self._history:
+            return self._history.pop(0)
         return None
 
 
@@ -231,6 +248,37 @@ class MusicCog(commands.Cog):
     async def next_track(self, interaction: discord.Interaction) -> None:
         await self._handle_next(interaction)
 
+    @app_commands.command(name="previous", description="Rejoue la musique précédente")
+    async def previous_track(self, interaction: discord.Interaction) -> None:
+        guild = interaction.guild
+        if guild is None:
+            await interaction.response.send_message("❌ Cette commande ne fonctionne que dans un serveur.", ephemeral=True)
+            return
+
+        player = self._get_player(guild)
+
+        if player is None or not player.connected:
+            await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
+            return
+
+        queue = get_queue(guild.id)
+
+        if queue.history_length == 0:
+            await interaction.response.send_message("⏮ Aucune musique précédente.", ephemeral=True)
+            return
+
+        # Save current track to history if playing
+        if player.current_track:
+            queue.push_history(player.current_track)
+
+        prev_track = queue.get_previous()
+        if prev_track:
+            log.info("Playing previous track: %s", prev_track.title)
+            await player.play(prev_track)
+            await interaction.response.send_message(f"⏮ Lecture précédente :\n{format_track(prev_track)}")
+        else:
+            await interaction.response.send_message("⏮ Aucune musique précédente.", ephemeral=True)
+
     async def _handle_next(self, interaction: discord.Interaction) -> None:
         guild = interaction.guild
         if guild is None:
@@ -244,6 +292,10 @@ class MusicCog(commands.Cog):
             return
 
         queue = get_queue(guild.id)
+
+        # Save current track to history before skipping
+        if player.current_track:
+            queue.push_history(player.current_track)
 
         if queue.is_empty:
             # No queued tracks — just skip current
