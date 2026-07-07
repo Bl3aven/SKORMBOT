@@ -10,11 +10,11 @@ services:
       - .env
     depends_on:
       - lavalink
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   lavalink:
-    image: fredboat/lavalink:latest
+    build:
+      context: ./lavalink
+      dockerfile: Dockerfile
     container_name: skorm-lavalink
     restart: unless-stopped
     ports:

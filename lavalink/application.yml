@@ -5,7 +5,7 @@ server:
 
 lavalink:
   server:
-    password: ${LAVALINK_PASSWORD:skorm}
+    password: skorm
     sources:
       - youtube
       - soundcloud
@@ -24,3 +24,10 @@ lavalink:
     playerUpdateInterval: 5
     youtubeSearchEnabled: true
     soundcloudSearchEnabled: true
+
+  plugins:
+    - |
+      me.kami.lavalink.spotify.SpotifyPluginConfig {
+        clientId = "8135bad63143448190f458e0587ba33f"
+        clientSecret = "76e07ab4ac2d4e13a37ff561d9d5febd"
+      }
