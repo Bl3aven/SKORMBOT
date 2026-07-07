@@ -168,7 +168,7 @@ class MusicCog(commands.Cog):
     # --- Slash commands ---
 
     @app_commands.command(name="play", description="Joue une musique (SoundCloud, YouTube, Spotify, etc.)")
-    @app_commands.describe(query="URL ou recherche (ex: https://on.soundcloud.com/xxx)")
+    @app_commands.describe(query="URL, recherche, ou numéro de la file d'attente")
     async def play(self, interaction: discord.Interaction, query: str) -> None:
         guild = interaction.guild
         if guild is None:
@@ -190,8 +190,32 @@ class MusicCog(commands.Cog):
             await interaction.followup.send(f"❌ Impossible de rejoindre le salon vocal : {exc}")
             return
 
-        # Search for track
+        # Check if query is a number (play from queue by index)
         query_str = query.strip()
+        queue = get_queue(guild.id)
+
+        if query_str.isdigit():
+            index = int(query_str)
+            if index < 1 or index > queue.length:
+                await interaction.followup.send(f"❌ Index invalide. La file contient {queue.length} piste(s). Utilise `/queue` pour voir la liste.")
+                return
+
+            # Get track at index (1-based)
+            track = queue._queue.pop(index - 1)
+            log.info("Playing track #%d from queue: %s", index, track.title)
+
+            if player.playing:
+                # Save current track to history
+                if player.current_track:
+                    queue.push_history(player.current_track)
+                await player.play(track)
+            else:
+                await player.play(track)
+
+            await interaction.followup.send(f"🎵 Lecture de la piste #{index} :\n{format_track(track)}")
+            return
+
+        # Search for track
         pool = self.bot.wavelink
         log.info("Music search query: %s", query_str[:100])
         
@@ -346,15 +370,25 @@ class MusicCog(commands.Cog):
             return
 
         lines = []
-        if player and player.current:
-            lines.append(f"**🎵 En lecture :**\n{format_track(player.current, 0)}")
 
-        for i, track in enumerate(queue._queue, start=1):
-            lines.append(format_track(track, i))
+        # Current track
+        if player and player.current_track:
+            current = player.current_track
+            duration = current.length // 1000 if current.length else 0
+            minutes = duration // 60
+            seconds = duration % 60
+            lines.append(f"**🎵 En lecture :**\n**{current.title}** — {current.author}\n   ⏱ {minutes}:{seconds:02d}")
 
-        if not lines:
-            await interaction.response.send_message("🎵 File d'attente vide.")
-            return
+        # Queue
+        if not queue.is_empty:
+            lines.append("**📋 File d'attente :**")
+            for i, track in enumerate(queue._queue, start=1):
+                duration = track.length // 1000 if track.length else 0
+                minutes = duration // 60
+                seconds = duration % 60
+                lines.append(f"**{i}. [{track.title}]({track.uri})** — {track.author}\n   ⏱ {minutes}:{seconds:02d}")
+        else:
+            lines.append("*Aucune piste en attente.*")
 
         description = "\n\n".join(lines)
         embed = create_embed(
