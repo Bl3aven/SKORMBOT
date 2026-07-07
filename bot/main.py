@@ -58,10 +58,13 @@ async def load_cogs() -> None:
 
     # Connect to Lavalink
     try:
-        bot.wavelink = await wavelink.connect(
-            f"{LAVALINK_HOST}:{LAVALINK_PORT}",
-            password=LAVALINK_PASSWORD,
-            http_trace=False,
+        bot.wavelink = wavelink.Pool(
+            nodes=[
+                wavelink.Node(
+                    uri=f"http://{LAVALINK_HOST}:{LAVALINK_PORT}",
+                    password=LAVALINK_PASSWORD,
+                )
+            ]
         )
         log.info("Connected to Lavalink at %s:%s", LAVALINK_HOST, LAVALINK_PORT)
     except Exception as exc:

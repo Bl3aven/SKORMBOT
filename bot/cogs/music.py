@@ -1,5 +1,5 @@
 """
-SKORMAgency - Music cog (Lavalink + wavelink)
+SKORMAgency - Music cog (Lavalink + wavelink 3.x)
 Play music from SoundCloud, YouTube, Spotify, and 100+ sources via Lavalink.
 
 Commands:
@@ -26,11 +26,11 @@ log = logging.getLogger("skorm.music")
 
 
 class MusicQueue:
-    """Per-guild music queue wrapper around wavelink."""
+    """Per-guild music queue wrapper."""
 
     def __init__(self, guild_id: int):
         self.guild_id = guild_id
-        self._queue: list[wavelink.Track] = []
+        self._queue: list[wavelink.Playable] = []
 
     @property
     def is_empty(self) -> bool:
@@ -40,10 +40,10 @@ class MusicQueue:
     def length(self) -> int:
         return len(self._queue)
 
-    def put(self, track: wavelink.Track) -> None:
+    def put(self, track: wavelink.Playable) -> None:
         self._queue.append(track)
 
-    def get(self) -> Optional[wavelink.Track]:
+    def get(self) -> Optional[wavelink.Playable]:
         if self._queue:
             return self._queue.pop(0)
         return None
@@ -51,7 +51,7 @@ class MusicQueue:
     def clear(self) -> None:
         self._queue.clear()
 
-    def peek(self) -> Optional[wavelink.Track]:
+    def peek(self) -> Optional[wavelink.Playable]:
         if self._queue:
             return self._queue[0]
         return None
@@ -67,9 +67,9 @@ def get_queue(guild_id: int) -> MusicQueue:
     return _queues[guild_id]
 
 
-def format_track(track: wavelink.Track, index: int = 0) -> str:
+def format_track(track: wavelink.Playable, index: int = 0) -> str:
     """Format a track for display."""
-    duration = track.duration // 1000 if track.duration else 0
+    duration = track.length // 1000 if track.length else 0
     minutes = duration // 60
     seconds = duration % 60
     return (
@@ -95,20 +95,13 @@ class MusicCog(commands.Cog):
 
     # --- Lavalink event: track finished ---
     @wavelink.event
-    async def track_end(self, player: wavelink.Player, track: wavelink.Track, reason: str) -> None:
+    async def track_end(self, player: wavelink.Player, track: wavelink.Playable, reason: str) -> None:
         """Play next track from queue when current track ends."""
         guild_id = player.guild.id
         queue = get_queue(guild_id)
 
         if queue.is_empty:
             await player.stop()
-            # Notify in voice channel text channel if possible
-            vc = player.voice_client
-            if vc and vc.channel:
-                try:
-                    await vc.channel.send("🎵 File d'attente vide. Utilise `/play <url>` pour lancer de la musique !")
-                except Exception:
-                    pass
             return
 
         next_track = queue.get()
@@ -116,7 +109,7 @@ class MusicCog(commands.Cog):
             await player.play(next_track)
 
     @wavelink.event
-    async def track_stuck(self, player: wavelink.Player, track: wavelink.Track, threshold: int) -> None:
+    async def track_stuck(self, player: wavelink.Player, track: wavelink.Playable, threshold: int) -> None:
         log.warning("Track stuck: %s", track.title)
 
     @wavelink.event
@@ -141,28 +134,30 @@ class MusicCog(commands.Cog):
 
         await interaction.response.defer()
 
-        # Get or create player
-        player = self.bot.wavelink.get_player(guild)
-        if not player.is_connected:
+        # Get player
+        pool = self.bot.wavelink
+        node = pool.get_node()
+        player = node.get_player(guild)
+
+        if not player.connected:
             try:
-                await voice_channel.connect(cls=lambda vc: wavelink.Player(vc, guild))
+                await player.connect(voice_channel)
             except Exception as exc:
                 await interaction.followup.send(f"❌ Impossible de rejoindre le salon vocal : {exc}")
                 return
-            player = self.bot.wavelink.get_player(guild)
 
         # Search for track
         query_str = query.strip()
-        tracks = await player.node.search(query_str, source_managers=wavelink.SearchType.AUTO_SEARCH)
+        tracks = await node.fetch_tracks(query_str)
 
         if not tracks:
             await interaction.followup.send("❌ Aucun résultat trouvé.")
             return
 
-        track = tracks[0].track
+        track = tracks[0]
         queue = get_queue(guild.id)
 
-        if player.is_playing:
+        if player.playing:
             queue.put(track)
             await interaction.followup.send(
                 f"✅ Ajouté à la file :\n{format_track(track, queue.length)}"
@@ -179,14 +174,17 @@ class MusicCog(commands.Cog):
         if guild is None:
             return
 
-        player = self.bot.wavelink.get_player(guild)
-        if not player.is_connected:
+        pool = self.bot.wavelink
+        node = pool.get_node()
+        player = node.get_player(guild)
+
+        if not player.connected:
             await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
             return
 
         get_queue(guild.id).clear()
         await player.stop()
-        await player.voice_client.disconnect()
+        await player.disconnect()
         await interaction.response.send_message("🛑 Musique arrêtée et file d'attente vidée.")
 
     @app_commands.command(name="skip", description="Passe à la piste suivante")
@@ -195,8 +193,11 @@ class MusicCog(commands.Cog):
         if guild is None:
             return
 
-        player = self.bot.wavelink.get_player(guild)
-        if not player.is_playing:
+        pool = self.bot.wavelink
+        node = pool.get_node()
+        player = node.get_player(guild)
+
+        if not player.playing:
             await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
             return
 
@@ -209,16 +210,19 @@ class MusicCog(commands.Cog):
         if guild is None:
             return
 
-        player = self.bot.wavelink.get_player(guild)
-        if not player.is_connected:
+        pool = self.bot.wavelink
+        node = pool.get_node()
+        player = node.get_player(guild)
+
+        if not player.connected:
             await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
             return
 
-        if player.is_paused:
-            await player.set_pause(False)
+        if player.paused:
+            await player.pause(False)
             await interaction.response.send_message("▶ Lecture reprise.")
         else:
-            await player.set_pause(True)
+            await player.pause(True)
             await interaction.response.send_message("⏸ Lecture en pause.")
 
     @app_commands.command(name="queue", description="Affiche la file d'attente")
@@ -227,16 +231,18 @@ class MusicCog(commands.Cog):
         if guild is None:
             return
 
-        player = self.bot.wavelink.get_player(guild)
+        pool = self.bot.wavelink
+        node = pool.get_node()
+        player = node.get_player(guild)
         queue = get_queue(guild.id)
 
-        if not player.is_playing and queue.is_empty:
+        if not player.playing and queue.is_empty:
             await interaction.response.send_message("🎵 File d'attente vide. Utilise `/play <url>` pour commencer !", ephemeral=True)
             return
 
         lines = []
-        if player.current_track:
-            lines.append(f"**🎵 En lecture :**\n{format_track(player.current_track, 0)}")
+        if player.current:
+            lines.append(f"**🎵 En lecture :**\n{format_track(player.current, 0)}")
 
         for i, track in enumerate(queue._queue, start=1):
             lines.append(format_track(track, i))
@@ -248,7 +254,7 @@ class MusicCog(commands.Cog):
         description = "\n\n".join(lines)
         embed = create_embed(
             title=f"🎵 File d'attente — {BRAND_NAME}",
-            description=description[:4000],  # Discord embed limit
+            description=description[:4000],
         )
         await interaction.response.send_message(embed=embed)
 
@@ -259,8 +265,11 @@ class MusicCog(commands.Cog):
         if guild is None:
             return
 
-        player = self.bot.wavelink.get_player(guild)
-        if not player.is_connected:
+        pool = self.bot.wavelink
+        node = pool.get_node()
+        player = node.get_player(guild)
+
+        if not player.connected:
             await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
             return
 
@@ -274,15 +283,17 @@ class MusicCog(commands.Cog):
         if guild is None:
             return
 
-        player = self.bot.wavelink.get_player(guild)
-        track = player.current_track
+        pool = self.bot.wavelink
+        node = pool.get_node()
+        player = node.get_player(guild)
+        track = player.current
 
         if not track:
             await interaction.response.send_message("🎵 Aucune musique en cours.", ephemeral=True)
             return
 
         progress = player.position
-        duration = track.duration
+        duration = track.length
 
         def _progress_bar(current: int, total: int, width: int = 15) -> str:
             if total <= 0:
