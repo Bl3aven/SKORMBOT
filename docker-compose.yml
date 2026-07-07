@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  skorm-bot:
+    build: .
+    container_name: skorm-bot
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
