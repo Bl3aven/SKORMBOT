@@ -27,6 +27,52 @@ class WelcomeCog(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
+        self._verify_message_id: int | None = None
+
+    @commands.Cog.listener()
+    async def on_ready(self) -> None:
+        """Find or create the persistent verification message in │rules."""
+        from bot.config import SERVER_ID
+        if not SERVER_ID:
+            return
+        guild = self.bot.get_guild(SERVER_ID)
+        if not guild:
+            return
+
+        rules_channel = get_channel_by_name(guild, RULES_CHANNEL_NAME)
+        if not rules_channel:
+            return
+
+        # Try to find existing verification message (by bot, with Règlement title)
+        try:
+            async for msg in rules_channel.history(limit=50):
+                if msg.author == self.bot.user and msg.embeds and "Règlement" in msg.embeds[0].title:
+                    self._verify_message_id = msg.id
+                    # Ensure ✅ reaction is present
+                    if not any(str(r.emoji) == VERIFY_EMOJI for r in msg.reactions):
+                        await msg.add_reaction(VERIFY_EMOJI)
+                    log.info("Found existing verification message %s in │rules", msg.id)
+                    return
+        except Exception as exc:
+            log.warning("Failed to search for verification message: %s", exc)
+
+        # Create verification message if not found
+        try:
+            verify_embed = create_embed(
+                title="📖 Règlement SKORM",
+                description=(
+                    "Bienvenue sur **SKORM** !\n\n"
+                    "Pour accéder au serveur, réagis avec ✅ ci-dessous\n"
+                    "pour accepter le règlement."
+                ),
+                color=0xFFFFFF,
+            )
+            msg = await rules_channel.send(embed=verify_embed)
+            await msg.add_reaction(VERIFY_EMOJI)
+            self._verify_message_id = msg.id
+            log.info("Created verification message %s in │rules", msg.id)
+        except Exception as exc:
+            log.error("Failed to create verification message: %s", exc)
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
@@ -50,24 +96,7 @@ class WelcomeCog(commands.Cog):
             except Exception as exc:
                 log.error("Failed to send welcome message: %s", exc)
 
-        # 2. Post verification message in │rules
-        if rules_channel:
-            try:
-                rules_embed = create_embed(
-                    title="📖 Règlement SKORM",
-                    description=(
-                        f"👋 **Bienvenue {member.mention} !**\n\n"
-                        "Pour accéder au serveur, réagis avec ✅ ci-dessous "
-                        "pour accepter le règlement."
-                    ),
-                    color=0xFFFFFF,
-                )
-                msg = await rules_channel.send(embed=rules_embed)
-                await msg.add_reaction(VERIFY_EMOJI)
-            except Exception as exc:
-                log.error("Failed to post verification in │rules: %s", exc)
-
-        # 3. Send DM with welcome + 2 tasks
+        # 2. Send DM with welcome + 2 tasks
         try:
             dm_embed = create_embed(
                 title="🌩️ Bienvenue chez SKORM !",
@@ -128,22 +157,8 @@ class WelcomeCog(commands.Cog):
         if payload.channel_id != rules_channel.id:
             return
 
-        # Fetch the message to verify it's a rules embed
-        try:
-            msg = await rules_channel.fetch_message(payload.message_id)
-        except discord.NotFound:
-            log.warning("Verification message %s not found", payload.message_id)
-            return
-        except Exception as exc:
-            log.error("Failed to fetch message %s: %s", payload.message_id, exc)
-            return
-
-        # Check this is a verification embed (posted by bot with rules title)
-        if msg.author != self.bot.user:
-            return
-        if not msg.embeds:
-            return
-        if "Règlement" not in msg.embeds[0].title:
+        # Check this is the verification message
+        if self._verify_message_id and payload.message_id != self._verify_message_id:
             return
 
         log.info("Verification reaction from %s in channel %s", member.display_name, rules_channel.name)
@@ -165,7 +180,7 @@ class WelcomeCog(commands.Cog):
 
         # Remove reaction after verification
         try:
-            await msg.remove_reaction(payload.emoji, member)
+            await rules_channel.remove_reaction(payload.emoji, member, payload.message_id)
         except Exception:
             pass
 

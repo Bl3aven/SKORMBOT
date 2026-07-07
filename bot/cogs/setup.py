@@ -507,6 +507,7 @@ class SetupCog(commands.Cog):
         overwrites: dict,
     ) -> None:
         """Apply category overwrites to all existing channels in the category."""
+        synced = 0
         for channel in category.channels:
             try:
                 # Merge category overwrites with channel-specific overwrites
@@ -516,9 +517,11 @@ class SetupCog(commands.Cog):
                     if target not in ch_overwrites:
                         ch_overwrites[target] = overwrite
                 await channel.edit(overwrites=ch_overwrites, reason="SKORM - sync category perms")
+                synced += 1
                 await asyncio.sleep(0.2)
             except Exception as exc:
                 log.warning("Failed to sync perms for channel %s: %s", channel.name, exc)
+        log.info("Synced %d/%d channels in category %s", synced, len(category.channels), category.name)
 
     async def _apply_permissions(
         self,
