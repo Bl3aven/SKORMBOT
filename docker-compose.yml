@@ -19,6 +19,8 @@ services:
     restart: unless-stopped
     ports:
       - "2333:2333"
+    env_file:
+      - .env
     volumes:
       - ./lavalink/application.yml:/opt/Lavalink/application.yml:ro
 

@@ -37,6 +37,6 @@ plugins:
     sources:
       spotify: true
     spotify:
-      clientId: "8135bad63143448190f458e0587ba33f"
-      clientSecret: "76e07ab4ac2d4e13a37ff561d9d5febd"
+      clientId: "${SPOTIFY_CLIENT_ID}"
+      clientSecret: "${SPOTIFY_CLIENT_SECRET}"
       preferPartnerApi: false
