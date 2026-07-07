@@ -91,53 +91,81 @@ class WelcomeCog(commands.Cog):
             log.error("Failed to send DM to %s: %s", member, exc)
 
     @commands.Cog.listener()
-    async def on_reaction_add(self, reaction: discord.Reaction, user) -> None:
-        # Only handle verification reactions in │rules channel
-        if user.bot:
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent) -> None:
+        """Handle verification using raw events (works without message cache)."""
+        if payload.user_id == self.bot.user.id:
             return
-        if str(reaction.emoji) != VERIFY_EMOJI:
+        if payload.guild_id is None:
             return
 
-        channel = reaction.message.channel
-        rules_channel = get_channel_by_name(channel.guild, RULES_CHANNEL_NAME)
-        if channel.id != rules_channel.id:
+        guild = self.bot.get_guild(payload.guild_id)
+        if guild is None:
+            return
+
+        member = guild.get_member(payload.user_id)
+        if member is None or member.bot:
+            return
+
+        # Check emoji
+        emoji_str = str(payload.emoji)
+        emoji_name = getattr(payload.emoji, 'name', '')
+        is_verify = (
+            emoji_str == VERIFY_EMOJI or
+            emoji_name == VERIFY_EMOJI or
+            emoji_str == "\U00002705" or
+            emoji_str == "\u2705" or
+            "white_check_mark" in emoji_name or
+            "check" in emoji_name.lower()
+        )
+        if not is_verify:
+            return
+
+        # Find │rules channel
+        rules_channel = get_channel_by_name(guild, RULES_CHANNEL_NAME)
+        if rules_channel is None:
+            log.warning("│rules channel not found for verification")
+            return
+        if payload.channel_id != rules_channel.id:
+            return
+
+        # Fetch the message to verify it's a rules embed
+        try:
+            msg = await rules_channel.fetch_message(payload.message_id)
+        except discord.NotFound:
+            log.warning("Verification message %s not found", payload.message_id)
+            return
+        except Exception as exc:
+            log.error("Failed to fetch message %s: %s", payload.message_id, exc)
             return
 
         # Check this is a verification embed (posted by bot with rules title)
-        if reaction.message.author != self.bot.user:
+        if msg.author != self.bot.user:
             return
-        if not reaction.message.embeds:
+        if not msg.embeds:
             return
-        if "Règlement" not in reaction.message.embeds[0].title:
+        if "Règlement" not in msg.embeds[0].title:
             return
 
-        guild = channel.guild
-        member = guild.get_member(user.id)
-        if member is None:
-            return
+        log.info("Verification reaction from %s in channel %s", member.display_name, rules_channel.name)
 
         verified_role = get_role_by_name(guild, "Verified")
-
         if verified_role is None:
-            try:
-                await reaction.message.channel.send(
-                    "❌ Rôle `Verified` introuvable.", delete_after=5.0
-                )
-            except Exception:
-                pass
+            log.error("Verified role not found in guild %s", guild.name)
             return
 
         try:
             await member.add_roles(verified_role, reason="SKORM verification (reaction)")
+            log.info("Granted Verified role to %s", member.display_name)
         except discord.Forbidden:
+            log.error("Forbidden to add role to %s", member.display_name)
             return
         except Exception as exc:
-            log.error("Verification failed: %s", exc)
+            log.error("Verification failed for %s: %s", member.display_name, exc)
             return
 
         # Remove reaction after verification
         try:
-            await reaction.message.remove_reaction(user, member)
+            await msg.remove_reaction(payload.emoji, member)
         except Exception:
             pass
 

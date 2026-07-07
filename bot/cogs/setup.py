@@ -538,25 +538,38 @@ class SetupCog(commands.Cog):
         accueil = find_category("Accueil")
         if accueil:
             try:
-                await accueil.edit(
-                    overwrites={
-                        everyone: discord.PermissionOverwrite(view_channel=False),
-                        **{
-                            role_map[n]: discord.PermissionOverwrite(
-                                view_channel=True, send_messages=True,
-                                read_message_history=True,
-                            )
-                            for n in (
-                                list(DIRECTION_ROLES)
-                                + list(STAFF_ROLES)
-                                + ["Artist", "Agent", "Student",
-                                   "Verified", "Verified Member", "Community", "Partner"]
-                            )
-                            if n in role_map
-                        },
-                    }
-                )
+                accueil_overwrites = {
+                    everyone: discord.PermissionOverwrite(view_channel=False),
+                    **{
+                        role_map[n]: discord.PermissionOverwrite(
+                            view_channel=True, send_messages=True,
+                            read_message_history=True,
+                        )
+                        for n in (
+                            list(DIRECTION_ROLES)
+                            + list(STAFF_ROLES)
+                            + ["Artist", "Agent", "Student",
+                               "Verified", "Verified Member", "Community", "Partner"]
+                        )
+                        if n in role_map
+                    },
+                }
+                await accueil.edit(overwrites=accueil_overwrites)
                 await asyncio.sleep(0.3)
+
+                # Apply overwrites to ALL existing channels in the category
+                for channel in accueil.channels:
+                    try:
+                        # Merge category overwrites with channel-specific overwrites
+                        ch_overwrites = dict(accueil_overwrites)
+                        # Keep existing channel-specific overwrites that differ from category
+                        for target, overwrite in channel.overwrites.items():
+                            if target not in ch_overwrites:
+                                ch_overwrites[target] = overwrite
+                        await channel.edit(overwrites=ch_overwrites, reason="SKORM - sync category perms")
+                        await asyncio.sleep(0.2)
+                    except Exception as exc:
+                        log.warning("Failed to sync perms for channel %s: %s", channel.name, exc)
 
                 # │rules is the ONLY channel visible to everyone (pre-verification)
                 rules_channel = next(
@@ -564,10 +577,10 @@ class SetupCog(commands.Cog):
                     None,
                 )
                 if rules_channel:
+                    rules_overwrites = dict(accueil_overwrites)
+                    rules_overwrites[everyone] = discord.PermissionOverwrite(view_channel=True, read_message_history=True)
                     await rules_channel.edit(
-                        overwrites={
-                            everyone: discord.PermissionOverwrite(view_channel=True, read_message_history=True),
-                        },
+                        overwrites=rules_overwrites,
                         reason="SKORM - rules visible before verification",
                     )
                     await asyncio.sleep(0.3)
