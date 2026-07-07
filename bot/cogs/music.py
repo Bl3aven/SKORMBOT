@@ -196,7 +196,7 @@ class MusicCog(commands.Cog):
         # Wait for bot.wavelink to be set (by _connect_lavalink in main.py)
         for attempt in range(60):  # Max 60 seconds
             await asyncio.sleep(1)
-            if self.bot.wavelink is not None:
+            if getattr(self.bot, 'wavelink', None) is not None:
                 log.info("Lavalink connected, restoring music state...")
                 await self._restore_all_states()
                 return
