@@ -301,3 +301,12 @@ async def get_music_history(guild_id: int) -> list:
             (guild_id,),
         )
         return await cursor.fetchall()
+
+
+async def clear_music_state(guild_id: int) -> None:
+    """Clear all music state for a guild (called on /stop)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM music_state WHERE guild_id = ?", (guild_id,))
+        await db.execute("DELETE FROM music_queue WHERE guild_id = ?", (guild_id,))
+        await db.execute("DELETE FROM music_history WHERE guild_id = ?", (guild_id,))
+        await db.commit()

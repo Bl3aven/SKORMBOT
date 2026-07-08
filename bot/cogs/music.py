@@ -416,6 +416,8 @@ class MusicCog(commands.Cog):
         get_queue(guild.id).clear()
         await player.stop()
         await player.disconnect()
+        # Clear persisted state so it won't restore on restart
+        await music_db.clear_music_state(guild.id)
         await interaction.response.send_message("🛑 Musique arrêtée et file d'attente vidée.")
 
     @app_commands.command(name="skip", description="Passe à la piste suivante")
