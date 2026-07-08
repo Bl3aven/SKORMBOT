@@ -37,41 +37,28 @@ class MoonshineSTT:
             log.info("Initializing Moonshine STT...")
 
             # Lazy import - moonshine-voice may not be installed in dev
-            from moonshine_voice import Transcriber, download_model
+            from moonshine_voice import Transcriber, get_model_for_language
 
-            # Download or get cached model path
+            # Get or download model path
             try:
-                self._model_path, model_arch = download_model(
-                    language=self.MODEL_LANGUAGE,
-                    model_arch=self.MODEL_ARCH,
-                )
+                self._model_path, model_arch = get_model_for_language("en")
                 log.info("Moonshine model ready at: %s (arch=%s)", self._model_path, model_arch)
-            except Exception as download_err:
-                log.warning("Model download failed, checking cache: %s", download_err)
-                # Check if model is already cached (pre-downloaded in Docker)
-                cache_dir = Path(os.environ.get(
-                    "MOONSHINE_VOICE_CACHE",
-                    str(Path.home() / ".cache" / "moonshine_voice"),
-                ))
-                model_dir = cache_dir / "download.moonshine.ai" / "model" / "base-en" / "quantized" / "base-en"
-                if model_dir.exists():
-                    self._model_path = str(model_dir)
-                    log.info("Using cached Moonshine model at: %s", self._model_path)
-                else:
-                    raise RuntimeError(f"No Moonshine model found and download failed: {download_err}")
+            except Exception as model_err:
+                log.error("Failed to get Moonshine model: %s", model_err)
+                raise
 
             # Create transcriber
             self._transcriber = Transcriber(
                 model_path=self._model_path,
-                model_arch=self.MODEL_ARCH,
+                model_arch=model_arch,
                 update_interval=1.0,  # Update every second for streaming
             )
             self._initialized = True
             log.info("Moonshine STT initialized successfully")
             return True
 
-        except ImportError:
-            log.error("moonshine-voice package not installed. Run: pip install moonshine-voice")
+        except ImportError as e:
+            log.error("moonshine-voice import error: %s. Run: pip install moonshine-voice", e)
             return False
         except Exception as e:
             log.error("Failed to initialize Moonshine STT: %s", e)
