@@ -95,28 +95,28 @@ class RecordingSession:
             self.decoders[user_id] = opuslib.Decoder(OPUS_SAMPLE_RATE, OPUS_CHANNELS)
         return self.decoders[user_id]
 
-    def add_opus_packet(self, user_id: int, opus_data: bytes) -> None:
-        """Decode an Opus packet and append to the audio buffer."""
+    def _decode_opus_packet(self, user_id: int, opus_data: bytes) -> Optional[bytes]:
+        """Decode an Opus packet to mono PCM bytes (runs in thread pool)."""
         try:
             decoder = self.get_decoder(user_id)
             pcm = decoder.decode(opus_data, OPUS_FRAME_SIZE)
 
-            # Convert stereo to mono (average channels)
-            # PCM is 16-bit signed integers
-            samples = struct.unpack(f"{OPUS_FRAME_SIZE * OPUS_CHANNELS}h", pcm)
-            mono_samples = []
-            for i in range(0, len(samples), OPUS_CHANNELS):
-                # Average the channels
-                avg = sum(samples[i:i + OPUS_CHANNELS]) // OPUS_CHANNELS
-                mono_samples.append(avg)
-
-            # Pack mono samples back to bytes
-            mono_bytes = struct.pack(f"{len(mono_samples)}h", *mono_samples)
-            self.audio_buffer.extend(mono_bytes)
-
-            self.speakers.add(user_id)
+            # Convert stereo to mono using numpy (fast, vectorized)
+            samples = np.frombuffer(pcm, dtype=np.int16)
+            # Reshape to (frames, channels), average channels, flatten
+            samples = samples.reshape(-1, OPUS_CHANNELS).mean(axis=1).astype(np.int16)
+            return samples.tobytes()
         except Exception as e:
             log.debug("Failed to decode Opus packet for user %d: %s", user_id, e)
+            return None
+
+    async def add_opus_packet(self, user_id: int, opus_data: bytes) -> None:
+        """Decode an Opus packet in thread pool and append to the audio buffer."""
+        loop = asyncio.get_event_loop()
+        pcm_bytes = await loop.run_in_executor(None, self._decode_opus_packet, user_id, opus_data)
+        if pcm_bytes:
+            self.audio_buffer.extend(pcm_bytes)
+            self.speakers.add(user_id)
 
 
 # Active recording sessions per guild
@@ -340,7 +340,7 @@ class VoiceRecordCog(commands.Cog):
 
                     # Resolve speaker user ID from SSID
                     speaker_id = self._get_speaker_from_packet(voice_client, packet)
-                    session.add_opus_packet(speaker_id, opus_data)
+                    await session.add_opus_packet(speaker_id, opus_data)
                     packets_count += 1
 
                     # Update status message every 10 seconds
@@ -356,10 +356,12 @@ class VoiceRecordCog(commands.Cog):
                             pass
 
                 except asyncio.TimeoutError:
-                    # No data this second, continue
+                    # No data this second — check if we should stop
+                    if not session.is_recording:
+                        break
                     continue
                 except Exception as e:
-                    log.debug("Packet capture error: %s", e)
+                    log.debug("Packet capture error: %s", str(e))
                     if not session.is_recording:
                         break
 
@@ -609,20 +611,23 @@ class VoiceRecordCog(commands.Cog):
     @app_commands.command(name="stoprecord", description="Manually stop the current recording")
     async def stoprecord(self, interaction: discord.Interaction) -> None:
         """Manually stop the current recording."""
-        await interaction.response.defer(ephemeral=False)
-
         guild_id = interaction.guild.id
 
         if guild_id not in _active_sessions or not _active_sessions[guild_id].is_recording:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 embed=create_embed(
                     title="⚠️ No Active Recording",
                     description="There is no active recording in this server.",
                     color=COLOR_GRAY,
-                )
+                ),
+                ephemeral=False,
             )
             return
 
+        # Signal the capture loop to stop immediately (before deferring)
+        _active_sessions[guild_id].is_recording = False
+
+        await interaction.response.defer(ephemeral=False)
         await self._end_recording(guild_id, reason="Stopped manually by " + interaction.user.display_name)
 
 
