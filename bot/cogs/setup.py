@@ -740,6 +740,12 @@ class SetupCog(commands.Cog):
             try:
                 ow = {guild.default_role: deny_overwrite()}
 
+                # Preserve bot access to voice channels
+                bot_connect_ow = discord.PermissionOverwrite()
+                bot_connect_ow.connect = True
+                bot_connect_ow.speak = True
+                ow[guild.me] = bot_connect_ow
+
                 for role_name, role in role_map.items():
                     if role_name in ADMIN_ROLES or role.is_default():
                         continue
