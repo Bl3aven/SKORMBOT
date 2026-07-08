@@ -173,9 +173,6 @@ class VoiceRecordCog(commands.Cog):
             log.info("recv thread stopped: %d packets", packets_count)
 
     @commands.Cog.listener()
-    async def on_voice_state_update(self, member, before, after):
-
-    @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         """Detect when the last member leaves the recording channel."""
         guild_id = member.guild.id
