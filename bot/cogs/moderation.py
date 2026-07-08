@@ -363,8 +363,8 @@ class ModerationCog(commands.Cog):
             ephemeral=True,
         )
 
-    # === /cleanchat command (inside cog for proper sync) ===
-    @mod_group.command(name="cleanchat", description="Cleans all message history in the current channel.")
+    # === /cleanchat command ===
+    @app_commands.command(name="cleanchat", description="Cleans all message history in the current channel.")
     async def cleanchat(self, interaction: discord.Interaction) -> None:
         if not isinstance(interaction.user, discord.Member):
             await interaction.response.send_message("❌ AdminDiscord role required.", ephemeral=True)
