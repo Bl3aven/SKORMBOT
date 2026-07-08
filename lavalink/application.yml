@@ -7,19 +7,19 @@ lavalink:
   server:
     password: skorm
     sources:
-      - soundcloud
-      - bandcamp
-      - twitch
-      - vimeo
-      - http
-      - local
+      youtube: false
+      soundcloud: true
+      bandcamp: true
+      twitch: true
+      vimeo: true
+      http: true
+      local: false
     bufferDuration: -1
     frameBufferDuration: 5000
     opusEncodingQuality: 10
     resamplingQuality: HIGH
     trackStuckThreshold: 10000
     useSeekGetters: true
-    youtubePlaylistLoadLimit: 10
     playerUpdateInterval: 5
     youtubeSearchEnabled: false
     soundcloudSearchEnabled: true
