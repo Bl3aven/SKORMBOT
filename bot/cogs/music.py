@@ -496,8 +496,13 @@ class MusicCog(commands.Cog):
         pool = self.bot.wavelink
         log.info("Music search query: %s", query_str[:100])
         
+        # If not a URL, prefix with ytsearch: for Lavalink
+        search_query = query_str
+        if not any(query_str.startswith(prefix) for prefix in ["http://", "https://", "ytsearch:", "scsearch:", "spsearch:", "amsearch:", "dcsearch:"]):
+            search_query = f"ytsearch:{query_str}"
+        
         try:
-            tracks = await pool.fetch_tracks(query_str)
+            tracks = await pool.fetch_tracks(search_query)
         except Exception as search_exc:
             log.error("Lavalink search failed for '%s': %s", query_str[:100], search_exc, exc_info=True)
             await interaction.followup.send(f"❌ Erreur lors de la recherche : {search_exc}")
