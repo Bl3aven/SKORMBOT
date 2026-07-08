@@ -144,31 +144,36 @@ class VoiceRecordCog(commands.Cog):
             if session.is_recording:
                 await self._end_recording(guild_id, reason="Bot shutting down")
 
+    def _recv_thread(self, guild_id, voice_client):
+        """Dedicated thread that runs recv() loop - doesn't block main event loop."""
+        session = _active_sessions.get(guild_id)
+        if not session:
+            return
+        log.info("recv thread started for guild %d", guild_id)
+        packets_count = 0
+        try:
+            while session.is_recording:
+                try:
+                    packet = voice_client.recv(timeout=1.0)
+                    if packet is None:
+                        continue
+                    opus_data = getattr(packet, "voice_data", None) or getattr(packet, "data", None)
+                    if not opus_data:
+                        continue
+                    user_id = packet.user.id if hasattr(packet, "user") and packet.user else 0
+                    session.enqueue_packet(user_id, opus_data)
+                    packets_count += 1
+                except TimeoutError:
+                    continue
+                except Exception as e:
+                    log.debug("recv thread error: %s", e)
+                    if not session.is_recording:
+                        break
+        finally:
+            log.info("recv thread stopped: %d packets", packets_count)
+
     @commands.Cog.listener()
-    async def on_voice_receive(self, voice_packet) -> None:
-        """
-        Called in a separate thread when a voice packet arrives.
-        Thread-safe: only enqueue, never await anything here.
-        """
-        guild_id = voice_packet.guild.id if voice_packet.guild else 0
-
-        if guild_id not in _active_sessions:
-            return
-
-        session = _active_sessions[guild_id]
-        if not session.is_recording:
-            return
-
-        # Get raw Opus data
-        opus_data = getattr(voice_packet, "voice_data", None) or getattr(voice_packet, "data", None)
-        if not opus_data:
-            return
-
-        # Get speaker user ID
-        user_id = voice_packet.user.id if hasattr(voice_packet, "user") and voice_packet.user else 0
-
-        # Thread-safe enqueue
-        session.enqueue_packet(user_id, opus_data)
+    async def on_voice_state_update(self, member, before, after):
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
@@ -280,7 +285,12 @@ class VoiceRecordCog(commands.Cog):
         except Exception:
             pass
 
-        # Start background processor (non-blocking, reads from queue)
+        # Start recv thread (separate from main event loop)
+        recv_thread = threading.Thread(target=self._recv_thread, args=(guild_id, voice_client), daemon=True)
+        recv_thread.start()
+        log.info("recv thread started for guild %d", guild_id)
+
+        # Start background processor (reads from queue on main event loop)
         asyncio.create_task(self._process_packets(guild_id, voice_client))
 
     async def _process_packets(self, guild_id: int, voice_client: discord.VoiceClient) -> None:
