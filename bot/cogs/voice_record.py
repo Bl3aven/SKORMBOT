@@ -194,11 +194,9 @@ class VoiceRecordCog(commands.Cog):
             await self._end_recording(guild_id, reason="All members left the voice channel")
 
     async def _join_voice_channel(self, channel: discord.VoiceChannel) -> Optional[discord.VoiceClient]:
-        """Join a voice channel with voice receive enabled."""
+        """Join a voice channel."""
         try:
-            voice_client = await channel.connect(self_bot=True)
-            # Enable voice packet receiving
-            voice_client.recording = True
+            voice_client = await channel.connect()
             log.info("Joined voice channel: %s", channel.name)
             return voice_client
         except Exception as e:
