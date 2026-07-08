@@ -29,6 +29,61 @@ from bot.cogs import db as music_db
 log = logging.getLogger("skorm.music")
 
 
+class SearchView(discord.ui.View):
+    """View with buttons to select a track from search results."""
+
+    def __init__(self, tracks: list, user_id: int, cog: 'MusicCog') -> None:
+        super().__init__(timeout=120)
+        self.tracks = tracks[:5]  # Max 5 choices
+        self.user_id = user_id
+        self.cog = cog
+        self.selected = None
+
+        # Create buttons for each track
+        emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+        for i, track in enumerate(self.tracks):
+            emoji = emojis[i]
+            button = discord.ui.Button(
+                label=f"{emoji} {track.title[:20]}...",
+                style=discord.ButtonStyle.secondary,
+                custom_id=f"skorm:search:{i}",
+            )
+            button.callback = self._make_callback(track)
+            self.add_item(button)
+
+        # Cancel button
+        cancel = discord.ui.Button(
+            label="❌ Annuler",
+            style=discord.ButtonStyle.danger,
+            custom_id="skorm:search:cancel",
+        )
+        cancel.callback = self._cancel_callback
+        self.add_item(cancel)
+
+    def _make_callback(self, track: wavelink.Playable):
+        async def callback(interaction: discord.Interaction, button: discord.ui.Button):
+            if interaction.user.id != self.user_id:
+                await interaction.response.send_message("❌ Ce bouton n'est pas pour toi.", ephemeral=True)
+                return
+            self.selected = track
+            await interaction.response.defer(ephemeral=True)
+            await self.cog._play_track(interaction, track)
+            self.stop()
+        return callback
+
+    async def _cancel_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ Ce bouton n'est pas pour toi.", ephemeral=True)
+            return
+        await interaction.response.edit_message(content="🔍 Recherche annulée.", view=None)
+        self.stop()
+
+    async def on_timeout(self) -> None:
+        for item in self.children:
+            if isinstance(item, discord.ui.Button):
+                item.disabled = True
+
+
 class MusicQueue:
     """Per-guild music queue wrapper with history support."""
 
@@ -297,6 +352,74 @@ class MusicCog(commands.Cog):
         node = pool.get_node()
         return node.get_player(guild.id)
 
+    async def _play_track(self, interaction: discord.Interaction, track: wavelink.Playable) -> None:
+        """Play or queue a track."""
+        guild = interaction.guild
+        if guild is None:
+            return
+
+        player = self._get_player(guild)
+        queue = get_queue(guild.id)
+
+        if player and player.playing:
+            queue.put(track)
+            await interaction.followup.send(
+                f"✅ Ajouté à la file :\n{format_track(track, queue.length)}"
+            )
+        else:
+            # Connect to voice channel if needed
+            voice_channel = interaction.user.voice.channel if interaction.user.voice else None
+            if not voice_channel:
+                await interaction.followup.send("❌ Rejoins d'abord un salon vocal !", ephemeral=True)
+                return
+
+            try:
+                player = await self._ensure_player(guild, voice_channel)
+            except Exception as exc:
+                await interaction.followup.send(f"❌ Impossible de rejoindre le salon vocal : {exc}")
+                return
+
+            # Apply default volume before playing
+            default_vol = await music_db.get_default_volume(guild.id)
+            await player.set_volume(default_vol)
+            await player.play(track)
+            await interaction.followup.send(
+                f"🎵 En lecture :\n{format_track(track)}"
+            )
+
+        # Save state
+        await self._save_state(guild.id)
+
+    async def _show_search_results(self, interaction: discord.Interaction, tracks: list) -> None:
+        """Show search results with buttons."""
+        # Build embed with top 5 results
+        lines = []
+        for i, track in enumerate(tracks[:5], start=1):
+            duration = track.length // 1000 if track.length else 0
+            minutes = duration // 60
+            seconds = duration % 60
+            lines.append(f"**{i}. [{track.title}]({track.uri})** — {track.author}\n   ⏱ {minutes}:{seconds:02d}")
+
+        embed = create_embed(
+            title="🔍 Résultats de recherche",
+            description="\n\n".join(lines),
+            color=0xFFFFFF,
+        )
+        embed.add_field(name="💡 Conseil", value="Clique sur un bouton pour jouer la piste sélectionnée.", inline=False)
+
+        view = SearchView(tracks, interaction.user.id, self)
+        msg = await interaction.followup.send(embed=embed, view=view)
+
+        # Wait for selection or timeout
+        await view.wait()
+
+        # Clean up if no selection
+        if view.selected is None:
+            try:
+                await msg.edit(view=None)
+            except Exception:
+                pass
+
     async def _ensure_player(self, guild: discord.Guild, voice_channel: discord.VoiceChannel) -> wavelink.Player:
         """Get existing player or connect to voice channel."""
         player = self._get_player(guild)
@@ -387,25 +510,14 @@ class MusicCog(commands.Cog):
             await interaction.followup.send("❌ Aucun résultat trouvé. Vérifie que l'URL est valide (Spotify, YouTube, SoundCloud, etc.).")
             return
 
-        track = tracks[0]
-        queue = get_queue(guild.id)
+        # If multiple results, show choices
+        if len(tracks) > 1:
+            await self._show_search_results(interaction, tracks)
+            return
 
-        if player.playing:
-            queue.put(track)
-            await interaction.followup.send(
-                f"✅ Ajouté à la file :\n{format_track(track, queue.length)}"
-            )
-        else:
-            # Apply default volume before playing
-            default_vol = await music_db.get_default_volume(guild.id)
-            await player.set_volume(default_vol)
-            await player.play(track)
-            await interaction.followup.send(
-                f"🎵 En lecture :\n{format_track(track)}"
-            )
-        
-        # Save state immediately after adding track
-        await self._save_state(guild.id)
+        # Single result - play directly
+        track = tracks[0]
+        await self._play_track(interaction, track)
 
     @app_commands.command(name="stop", description="Arrête la musique et vide la file d'attente")
     async def stop(self, interaction: discord.Interaction) -> None:
