@@ -29,61 +29,6 @@ from bot.cogs import db as music_db
 log = logging.getLogger("skorm.music")
 
 
-class SearchView(discord.ui.View):
-    """View with buttons to select a track from search results."""
-
-    def __init__(self, tracks: list, user_id: int, cog: 'MusicCog') -> None:
-        super().__init__(timeout=120)
-        self.tracks = tracks[:5]  # Max 5 choices
-        self.user_id = user_id
-        self.cog = cog
-        self.selected = None
-
-        # Create buttons for each track
-        emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
-        for i, track in enumerate(self.tracks):
-            emoji = emojis[i]
-            button = discord.ui.Button(
-                label=f"{emoji} {track.title[:20]}...",
-                style=discord.ButtonStyle.secondary,
-                custom_id=f"skorm:search:{i}",
-            )
-            button.callback = self._make_callback(track)
-            self.add_item(button)
-
-        # Cancel button
-        cancel = discord.ui.Button(
-            label="❌ Annuler",
-            style=discord.ButtonStyle.danger,
-            custom_id="skorm:search:cancel",
-        )
-        cancel.callback = self._cancel_callback
-        self.add_item(cancel)
-
-    def _make_callback(self, track: wavelink.Playable):
-        async def callback(interaction: discord.Interaction, button: discord.ui.Button):
-            if interaction.user.id != self.user_id:
-                await interaction.response.send_message("❌ Ce bouton n'est pas pour toi.", ephemeral=True)
-                return
-            self.selected = track
-            await interaction.response.defer(ephemeral=True)
-            await self.cog._play_track(interaction, track)
-            self.stop()
-        return callback
-
-    async def _cancel_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("❌ Ce bouton n'est pas pour toi.", ephemeral=True)
-            return
-        await interaction.response.edit_message(content="🔍 Recherche annulée.", view=None)
-        self.stop()
-
-    async def on_timeout(self) -> None:
-        for item in self.children:
-            if isinstance(item, discord.ui.Button):
-                item.disabled = True
-
-
 class MusicQueue:
     """Per-guild music queue wrapper with history support."""
 
@@ -176,6 +121,9 @@ class MusicCog(commands.Cog):
     async def cog_load(self) -> None:
         """Start periodic state save task."""
         self._save_task = asyncio.create_task(self._periodic_save())
+        # Store search results in memory keyed by message_id
+        self._search_results: dict[int, list] = {}
+        self._search_users: dict[int, int] = {}  # message_id -> user_id
 
     async def _periodic_save(self) -> None:
         """Save music state every 30 seconds."""
@@ -390,6 +338,52 @@ class MusicCog(commands.Cog):
         # Save state
         await self._save_state(guild.id)
 
+    @commands.Cog.listener("on_interaction")
+    async def on_interaction(self, interaction: discord.Interaction) -> None:
+        """Handle search button clicks via persistent custom_id."""
+        if not isinstance(interaction, discord.ComponentInteraction):
+            return
+        custom_id = interaction.data.get("custom_id", "")
+        if not custom_id.startswith("skorm:search:"):
+            return
+
+        msg_id = interaction.message.id
+        tracks = self._search_results.get(msg_id)
+        owner_id = self._search_users.get(msg_id)
+
+        if tracks is None:
+            await interaction.response.send_message("❌ Résultats expirés. Relance la recherche.", ephemeral=True)
+            return
+
+        if owner_id and interaction.user.id != owner_id:
+            await interaction.response.send_message("❌ Ce bouton n'est pas pour toi.", ephemeral=True)
+            return
+
+        if custom_id == "skorm:search:cancel":
+            self._search_results.pop(msg_id, None)
+            self._search_users.pop(msg_id, None)
+            for child in interaction.message.components[0].children:
+                child.disabled = True
+            await interaction.response.edit_message(content="🔍 Recherche annulée.", components=interaction.message.components)
+            return
+
+        # Extract index
+        try:
+            index = int(custom_id.split(":")[2])
+        except (IndexError, ValueError):
+            return
+
+        if index >= len(tracks):
+            return
+
+        track = tracks[index]
+        # Clean up
+        self._search_results.pop(msg_id, None)
+        self._search_users.pop(msg_id, None)
+
+        await interaction.response.defer(ephemeral=True)
+        await self._play_track(interaction, track)
+
     async def _show_search_results(self, interaction: discord.Interaction, tracks: list) -> None:
         """Show search results with buttons."""
         # Build embed with top 5 results
@@ -407,18 +401,44 @@ class MusicCog(commands.Cog):
         )
         embed.add_field(name="💡 Conseil", value="Clique sur un bouton pour jouer la piste sélectionnée.", inline=False)
 
-        view = SearchView(tracks, interaction.user.id, self)
+        # Build view with persistent buttons
+        view = discord.ui.View(timeout=120)
+        emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+        for i, track in enumerate(tracks[:5]):
+            button = discord.ui.Button(
+                label=f"{emojis[i]} {track.title[:20]}...",
+                style=discord.ButtonStyle.secondary,
+                custom_id=f"skorm:search:{i}",
+            )
+            view.add_item(button)
+
+        cancel = discord.ui.Button(
+            label="❌ Annuler",
+            style=discord.ButtonStyle.danger,
+            custom_id="skorm:search:cancel",
+        )
+        view.add_item(cancel)
+
         msg = await interaction.followup.send(embed=embed, view=view)
 
-        # Wait for selection or timeout
-        await view.wait()
+        # Store tracks in memory
+        self._search_results[msg.id] = tracks[:5]
+        self._search_users[msg.id] = interaction.user.id
 
-        # Clean up if no selection
-        if view.selected is None:
-            try:
-                await msg.edit(view=None)
-            except Exception:
-                pass
+        # Auto-disable buttons after timeout
+        async def _disable_after_timeout():
+            await asyncio.sleep(120)
+            if msg.id in self._search_results:
+                self._search_results.pop(msg.id, None)
+                self._search_users.pop(msg.id, None)
+                try:
+                    for child in view.children:
+                        child.disabled = True
+                    await msg.edit(view=view)
+                except Exception:
+                    pass
+
+        asyncio.create_task(_disable_after_timeout())
 
     async def _ensure_player(self, guild: discord.Guild, voice_channel: discord.VoiceChannel) -> wavelink.Player:
         """Get existing player or connect to voice channel."""
