@@ -369,13 +369,28 @@ class MusicCog(commands.Cog):
         # Search for track
         pool = self.bot.wavelink
         log.info("Music search query: %s", query_str[:100])
-        
-        try:
-            tracks = await pool.fetch_tracks(query_str)
-        except Exception as search_exc:
-            log.error("Lavalink search failed for '%s': %s", query_str[:100], search_exc, exc_info=True)
-            await interaction.followup.send(f"❌ Erreur lors de la recherche : {search_exc}")
-            return
+
+        tracks = None
+
+        # If it's not already a URL or source-prefixed query, try ytsearch: first
+        search_query = query_str
+        if not any(query_str.startswith(p) for p in ("http://", "https://", "ytsearch:", "scsearch:", "spsearch:", "ytsearch:", "amsearch:", "dcsearch:", "rvsearch:", "jjsearch:", "getyoutubemusic:")):
+            log.info("Trying ytsearch: prefix for: %s", query_str[:100])
+            try:
+                tracks = await pool.fetch_tracks(f"ytsearch:{query_str}")
+                log.info("ytsearch returned %d result(s)", len(tracks) if tracks else 0)
+            except Exception as e:
+                log.error("ytsearch failed: %s", e)
+                tracks = None
+
+        # Fallback: try without prefix
+        if not tracks:
+            try:
+                tracks = await pool.fetch_tracks(query_str)
+            except Exception as search_exc:
+                log.error("Lavalink search failed for '%s': %s", query_str[:100], search_exc, exc_info=True)
+                await interaction.followup.send(f"❌ Erreur lors de la recherche : {search_exc}")
+                return
 
         log.info("Search returned %d result(s) for: %s", len(tracks) if tracks else 0, query_str[:100])
         
