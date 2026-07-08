@@ -196,11 +196,19 @@ class VoiceRecordCog(commands.Cog):
     async def _join_voice_channel(self, channel: discord.VoiceChannel) -> Optional[discord.VoiceClient]:
         """Join a voice channel."""
         try:
+            log.info("Attempting to join voice channel: %s (id=%d) in guild %s",
+                    channel.name, channel.id, channel.guild.name)
             voice_client = await channel.connect()
-            log.info("Joined voice channel: %s", channel.name)
+            log.info("Successfully joined voice channel: %s", channel.name)
             return voice_client
+        except discord.Forbidden:
+            log.error("Forbidden: bot lacks permission to join %s. Check role permissions on the channel/category.", channel.name)
+            return None
+        except discord.InvalidArgument as e:
+            log.error("InvalidArgument joining %s: %s", channel.name, e)
+            return None
         except Exception as e:
-            log.error("Failed to join voice channel %s: %s", channel.name, e)
+            log.error("Failed to join voice channel %s: %s (%s)", channel.name, type(e).__name__, e)
             return None
 
     async def _start_recording(
