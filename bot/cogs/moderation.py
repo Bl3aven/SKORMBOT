@@ -401,8 +401,16 @@ class CleanChatView(discord.ui.View):
 
 # === Standalone slash command (not in group) ===
 @app_commands.command(name="cleanchat", description="Cleans all message history in the current channel.")
-@app_commands.checks.has_permissions(manage_messages=True)
 async def cleanchat(interaction: discord.Interaction) -> None:
+    # AdminDiscord role only
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("❌ Staff only.", ephemeral=True)
+        return
+    has_role = any(r.name == "Admin" for r in interaction.user.roles)
+    if not has_role:
+        await interaction.response.send_message("❌ AdminDiscord role required.", ephemeral=True)
+        return
+
     channel = interaction.channel
     if not isinstance(channel, discord.TextChannel):
         await interaction.response.send_message("❌ This command only works in text channels.", ephemeral=True)
