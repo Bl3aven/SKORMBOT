@@ -367,6 +367,8 @@ class VoiceRecordCog(commands.Cog):
                     log.debug("Packet capture error: %s", str(e))
                     if not session.is_recording:
                         break
+                    # Prevent tight error loop
+                    await asyncio.sleep(0.1)
 
             log.info("Capture ended: %d packets from %d speakers", packets_count, len(session.speakers))
 
