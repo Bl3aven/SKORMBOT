@@ -362,8 +362,77 @@ class ModerationCog(commands.Cog):
             ephemeral=True,
         )
 
+    # === /cleanchat command (inside cog for proper sync) ===
+    @mod_group.command(name="cleanchat", description="Cleans all message history in the current channel.")
+    async def cleanchat(self, interaction: discord.Interaction) -> None:
+        if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message("❌ Admin role required.", ephemeral=True)
+            return
+        has_role = any(r.name == "Admin" for r in interaction.user.roles)
+        if not has_role:
+            await interaction.response.send_message("❌ Admin role required.", ephemeral=True)
+            return
 
-# === Clean Chat View ===
+        channel = interaction.channel
+        if not isinstance(channel, discord.TextChannel):
+            await interaction.response.send_message("❌ This command only works in text channels.", ephemeral=True)
+            return
+
+        await interaction.response.send_message(
+            embed=create_embed(
+                title="🧹 Clean Chat",
+                description=(
+                    f"This will delete **all messages** in {channel.mention}.\n\n"
+                    "This action is **irreversible**.\n\n"
+                    "Confirm below to proceed."
+                ),
+                color=0xFF0000,
+            ),
+            view=CleanChatView(interaction.user.id),
+        )
+
+        view: CleanChatView = interaction.response.message.view
+        await view.wait()
+
+        if not view.value:
+            return
+
+        status_msg = await interaction.channel.send("⏳ Cleaning channel…")
+        deleted = 0
+        errors = 0
+
+        async for msg in channel.history(limit=None, oldest_first=False):
+            if msg.id == status_msg.id:
+                continue
+            if msg.system:
+                continue
+            try:
+                await msg.delete()
+                deleted += 1
+                if deleted % 100 == 0:
+                    await status_msg.edit(content=f"⏳ Cleaning channel… ({deleted} deleted)")
+                    await asyncio.sleep(1)
+            except discord.Forbidden:
+                errors += 1
+            except discord.HTTPException:
+                errors += 1
+                await asyncio.sleep(2)
+
+        await status_msg.edit(content=(
+            f"✅ **Channel cleaned!**\n\n"
+            f"Deleted: {deleted} messages\n"
+            f"Errors: {errors}\n\n"
+            f"Requested by {interaction.user.mention}"
+        ))
+
+        await asyncio.sleep(5)
+        try:
+            await status_msg.delete()
+        except discord.Forbidden:
+            pass
+
+
+# === Clean Chat View (must be outside cog for button callbacks) ===
 class CleanChatView(discord.ui.View):
     """Confirmation view for /cleanchat."""
 
@@ -399,80 +468,5 @@ class CleanChatView(discord.ui.View):
             child.disabled = True
 
 
-# === Standalone slash command (not in group) ===
-@app_commands.command(name="cleanchat", description="Cleans all message history in the current channel.")
-async def cleanchat(interaction: discord.Interaction) -> None:
-    # AdminDiscord role only
-    if not isinstance(interaction.user, discord.Member):
-        await interaction.response.send_message("❌ Staff only.", ephemeral=True)
-        return
-    has_role = any(r.name == "Admin" for r in interaction.user.roles)
-    if not has_role:
-        await interaction.response.send_message("❌ AdminDiscord role required.", ephemeral=True)
-        return
-
-    channel = interaction.channel
-    if not isinstance(channel, discord.TextChannel):
-        await interaction.response.send_message("❌ This command only works in text channels.", ephemeral=True)
-        return
-
-    await interaction.response.send_message(
-        embed=create_embed(
-            title="🧹 Clean Chat",
-            description=(
-                f"This will delete **all messages** in {channel.mention}.\n\n"
-                "This action is **irreversible**.\n\n"
-                "Confirm below to proceed."
-            ),
-            color=0xFF0000,
-        ),
-        view=CleanChatView(interaction.user.id),
-    )
-
-    # Wait for confirmation
-    view: CleanChatView = interaction.response.message.view
-    await view.wait()
-
-    if not view.value:
-        return
-
-    # Start cleaning
-    status_msg = await interaction.channel.send("⏳ Cleaning channel…")
-    deleted = 0
-    errors = 0
-
-    async for msg in channel.history(limit=None, oldest_first=False):
-        if msg.id == status_msg.id:
-            continue
-        if msg.system:
-            continue
-        try:
-            await msg.delete()
-            deleted += 1
-            if deleted % 100 == 0:
-                await status_msg.edit(content=f"⏳ Cleaning channel… ({deleted} deleted)")
-                await asyncio.sleep(1)
-        except discord.Forbidden:
-            errors += 1
-        except discord.HTTPException:
-            errors += 1
-            await asyncio.sleep(2)
-
-    await status_msg.edit(content=(
-        f"✅ **Channel cleaned!**\n\n"
-        f"Deleted: {deleted} messages\n"
-        f"Errors: {errors}\n\n"
-        f"Requested by {interaction.user.mention}"
-    ))
-
-    # Delete the confirmation message after 5s
-    await asyncio.sleep(5)
-    try:
-        await status_msg.delete()
-    except discord.Forbidden:
-        pass
-
-
 async def setup(bot: commands.Bot) -> None:
-    bot.tree.add_command(cleanchat)
     await bot.add_cog(ModerationCog(bot))
