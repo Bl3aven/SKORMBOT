@@ -2,6 +2,7 @@
 SKORMAgency - Moderation cog
 Slash commands for warn, mute, kick, ban + auto-deletion of suspicious links.
 """
+import asyncio
 import logging
 import re
 from datetime import datetime, timedelta
@@ -366,11 +367,11 @@ class ModerationCog(commands.Cog):
     @mod_group.command(name="cleanchat", description="Cleans all message history in the current channel.")
     async def cleanchat(self, interaction: discord.Interaction) -> None:
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("❌ Admin role required.", ephemeral=True)
+            await interaction.response.send_message("❌ AdminDiscord role required.", ephemeral=True)
             return
-        has_role = any(r.name == "Admin" for r in interaction.user.roles)
+        has_role = any(r.name == "AdminDiscord" for r in interaction.user.roles)
         if not has_role:
-            await interaction.response.send_message("❌ Admin role required.", ephemeral=True)
+            await interaction.response.send_message("❌ AdminDiscord role required.", ephemeral=True)
             return
 
         channel = interaction.channel

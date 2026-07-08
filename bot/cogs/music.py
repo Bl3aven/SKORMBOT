@@ -29,68 +29,6 @@ from bot.cogs import db as music_db
 log = logging.getLogger("skorm.music")
 
 
-class SearchButtonView(discord.ui.View):
-    """Persistent view for search result buttons."""
-
-    def __init__(self, cog: 'MusicCog') -> None:
-        super().__init__(timeout=None)
-        self.cog = cog
-
-    @discord.ui.button(label="1", style=discord.ButtonStyle.secondary, custom_id="skorm_search_0")
-    async def btn_0(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await self._handle_selection(interaction, 0)
-
-    @discord.ui.button(label="2", style=discord.ButtonStyle.secondary, custom_id="skorm_search_1")
-    async def btn_1(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await self._handle_selection(interaction, 1)
-
-    @discord.ui.button(label="3", style=discord.ButtonStyle.secondary, custom_id="skorm_search_2")
-    async def btn_2(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await self._handle_selection(interaction, 2)
-
-    @discord.ui.button(label="4", style=discord.ButtonStyle.secondary, custom_id="skorm_search_3")
-    async def btn_3(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await self._handle_selection(interaction, 3)
-
-    @discord.ui.button(label="5", style=discord.ButtonStyle.secondary, custom_id="skorm_search_4")
-    async def btn_4(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await self._handle_selection(interaction, 4)
-
-    @discord.ui.button(label="❌ Annuler", style=discord.ButtonStyle.danger, custom_id="skorm_search_cancel")
-    async def btn_cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        msg_id = interaction.message.id
-        self.cog._search_results.pop(msg_id, None)
-        self.cog._search_users.pop(msg_id, None)
-        for child in self.children:
-            child.disabled = True
-        await interaction.response.edit_message(view=self)
-
-    async def _handle_selection(self, interaction: discord.Interaction, index: int) -> None:
-        msg_id = interaction.message.id
-        tracks = self.cog._search_results.get(msg_id)
-        owner_id = self.cog._search_users.get(msg_id)
-
-        if tracks is None:
-            await interaction.response.send_message("❌ Résultats expirés. Relance la recherche.", ephemeral=True)
-            return
-
-        if owner_id and interaction.user.id != owner_id:
-            await interaction.response.send_message("❌ Ce bouton n'est pas pour toi.", ephemeral=True)
-            return
-
-        if index >= len(tracks):
-            await interaction.response.send_message("❌ Piste invalide.", ephemeral=True)
-            return
-
-        track = tracks[index]
-        # Clean up
-        self.cog._search_results.pop(msg_id, None)
-        self.cog._search_users.pop(msg_id, None)
-
-        await interaction.response.defer(ephemeral=True)
-        await self.cog._play_track(interaction, track)
-
-
 class MusicQueue:
     """Per-guild music queue wrapper with history support."""
 
@@ -174,9 +112,6 @@ class MusicCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self._save_task = None
-        # Store search results in memory keyed by message_id
-        self._search_results: dict[int, list] = {}
-        self._search_users: dict[int, int] = {}  # message_id -> user_id
 
     def cog_unload(self) -> None:
         _queues.clear()
@@ -186,8 +121,6 @@ class MusicCog(commands.Cog):
     async def cog_load(self) -> None:
         """Start periodic state save task."""
         self._save_task = asyncio.create_task(self._periodic_save())
-        # Register persistent view for search buttons
-        self.bot.add_view(SearchButtonView(self))
 
     async def _periodic_save(self) -> None:
         """Save music state every 30 seconds."""
@@ -364,89 +297,6 @@ class MusicCog(commands.Cog):
         node = pool.get_node()
         return node.get_player(guild.id)
 
-    async def _play_track(self, interaction: discord.Interaction, track: wavelink.Playable) -> None:
-        """Play or queue a track."""
-        guild = interaction.guild
-        if guild is None:
-            return
-
-        player = self._get_player(guild)
-        queue = get_queue(guild.id)
-
-        if player and player.playing:
-            queue.put(track)
-            await interaction.followup.send(
-                f"✅ Ajouté à la file :\n{format_track(track, queue.length)}"
-            )
-        else:
-            # Connect to voice channel if needed
-            voice_channel = interaction.user.voice.channel if interaction.user.voice else None
-            if not voice_channel:
-                await interaction.followup.send("❌ Rejoins d'abord un salon vocal !", ephemeral=True)
-                return
-
-            try:
-                player = await self._ensure_player(guild, voice_channel)
-            except Exception as exc:
-                await interaction.followup.send(f"❌ Impossible de rejoindre le salon vocal : {exc}")
-                return
-
-            # Apply default volume before playing
-            default_vol = await music_db.get_default_volume(guild.id)
-            await player.set_volume(default_vol)
-            await player.play(track)
-            await interaction.followup.send(
-                f"🎵 En lecture :\n{format_track(track)}"
-            )
-
-        # Save state
-        await self._save_state(guild.id)
-
-    async def _show_search_results(self, interaction: discord.Interaction, tracks: list) -> None:
-        """Show search results with persistent buttons."""
-        # Build embed with top 5 results
-        lines = []
-        for i, track in enumerate(tracks[:5], start=1):
-            duration = track.length // 1000 if track.length else 0
-            minutes = duration // 60
-            seconds = duration % 60
-            lines.append(f"**{i}. [{track.title}]({track.uri})** — {track.author}\n   ⏱ {minutes}:{seconds:02d}")
-
-        embed = create_embed(
-            title="🔍 Résultats de recherche",
-            description="\n\n".join(lines),
-            color=0xFFFFFF,
-        )
-        embed.add_field(name="💡 Conseil", value="Clique sur un bouton pour jouer la piste sélectionnée.", inline=False)
-
-        # Use persistent view
-        view = SearchButtonView(self)
-        # Disable buttons beyond available tracks
-        for i in range(len(tracks[:5]), 5):
-            view.children[i].disabled = True
-            view.children[i].style = discord.ButtonStyle.secondary
-
-        msg = await interaction.followup.send(embed=embed, view=view)
-
-        # Store tracks in memory
-        self._search_results[msg.id] = tracks[:5]
-        self._search_users[msg.id] = interaction.user.id
-
-        # Auto-disable buttons after timeout
-        async def _disable_after_timeout():
-            await asyncio.sleep(120)
-            if msg.id in self._search_results:
-                self._search_results.pop(msg.id, None)
-                self._search_users.pop(msg.id, None)
-                try:
-                    for child in view.children:
-                        child.disabled = True
-                    await msg.edit(view=view)
-                except Exception:
-                    pass
-
-        asyncio.create_task(_disable_after_timeout())
-
     async def _ensure_player(self, guild: discord.Guild, voice_channel: discord.VoiceChannel) -> wavelink.Player:
         """Get existing player or connect to voice channel."""
         player = self._get_player(guild)
@@ -511,9 +361,6 @@ class MusicCog(commands.Cog):
                     queue.push_history(player.current)
                 await player.play(track)
             else:
-                # Apply default volume when starting playback
-                default_vol = await music_db.get_default_volume(guild.id)
-                await player.set_volume(default_vol)
                 await player.play(track)
 
             await interaction.followup.send(f"🎵 Lecture de la piste #{index} :\n{format_track(track)}")
@@ -523,13 +370,8 @@ class MusicCog(commands.Cog):
         pool = self.bot.wavelink
         log.info("Music search query: %s", query_str[:100])
         
-        # If not a URL, prefix with ytsearch: for Lavalink
-        search_query = query_str
-        if not any(query_str.startswith(prefix) for prefix in ["http://", "https://", "ytsearch:", "scsearch:", "spsearch:", "amsearch:", "dcsearch:"]):
-            search_query = f"ytsearch:{query_str}"
-        
         try:
-            tracks = await pool.fetch_tracks(search_query)
+            tracks = await pool.fetch_tracks(query_str)
         except Exception as search_exc:
             log.error("Lavalink search failed for '%s': %s", query_str[:100], search_exc, exc_info=True)
             await interaction.followup.send(f"❌ Erreur lors de la recherche : {search_exc}")
@@ -542,14 +384,22 @@ class MusicCog(commands.Cog):
             await interaction.followup.send("❌ Aucun résultat trouvé. Vérifie que l'URL est valide (Spotify, YouTube, SoundCloud, etc.).")
             return
 
-        # If multiple results, show choices
-        if len(tracks) > 1:
-            await self._show_search_results(interaction, tracks)
-            return
-
-        # Single result - play directly
         track = tracks[0]
-        await self._play_track(interaction, track)
+        queue = get_queue(guild.id)
+
+        if player.playing:
+            queue.put(track)
+            await interaction.followup.send(
+                f"✅ Ajouté à la file :\n{format_track(track, queue.length)}"
+            )
+        else:
+            await player.play(track)
+            await interaction.followup.send(
+                f"🎵 En lecture :\n{format_track(track)}"
+            )
+        
+        # Save state immediately after adding track
+        await self._save_state(guild.id)
 
     @app_commands.command(name="stop", description="Arrête la musique et vide la file d'attente")
     async def stop(self, interaction: discord.Interaction) -> None:
@@ -566,8 +416,6 @@ class MusicCog(commands.Cog):
         get_queue(guild.id).clear()
         await player.stop()
         await player.disconnect()
-        # Clear persisted state so it won't restore on restart
-        await music_db.clear_music_state(guild.id)
         await interaction.response.send_message("🛑 Musique arrêtée et file d'attente vidée.")
 
     @app_commands.command(name="skip", description="Passe à la piste suivante")
@@ -703,8 +551,8 @@ class MusicCog(commands.Cog):
         )
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="volume", description="Régle le volume (0-100)")
-    @app_commands.describe(level="Volume de 0 à 100")
+    @app_commands.command(name="volume", description="Régle le volume (0-500)")
+    @app_commands.describe(level="Volume de 0 à 500 (100 = normal)")
     async def volume(self, interaction: discord.Interaction, level: int) -> None:
         guild = interaction.guild
         if guild is None:
@@ -716,20 +564,9 @@ class MusicCog(commands.Cog):
             await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
             return
 
-        level = max(0, min(100, level))
+        level = max(0, min(500, level))
         await player.set_volume(level)
         await interaction.response.send_message(f"🔊 Volume réglé à {level}%.")
-
-    @app_commands.command(name="setdefaultvolume", description="Définit le volume par défaut pour toutes les lectures (0-100)")
-    @app_commands.describe(level="Volume par défaut de 0 à 100")
-    async def setdefaultvolume(self, interaction: discord.Interaction, level: int) -> None:
-        guild = interaction.guild
-        if guild is None:
-            return
-
-        level = max(0, min(100, level))
-        await music_db.save_default_volume(guild.id, level)
-        await interaction.response.send_message(f"🔊 Volume par défaut réglé à {level}%.")
 
     @app_commands.command(name="nowplaying", description="Affiche la piste en cours")
     async def nowplaying(self, interaction: discord.Interaction) -> None:
@@ -766,42 +603,6 @@ class MusicCog(commands.Cog):
                 f"[**{track.title}**]({track.uri}) — {track.author}\n\n"
                 f"{bar} `{_fmt(progress)}` / `{_fmt(duration)}`"
             ),
-        )
-        await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(name="helpmusic", description="Affiche l'aide complète du système musical")
-    async def helpmusic(self, interaction: discord.Interaction) -> None:
-        embed = create_embed(
-            title=f"🎵 Aide — Musique {BRAND_NAME}",
-            description=(
-                "**Commandes disponibles :**\n\n"
-                "• `/play <url>` — Joue une musique (Spotify, YouTube, SoundCloud, etc.)\n"
-                "  Si une musique est déjà en cours, la piste est ajoutée à la file d'attente.\n\n"
-                "• `/play <numéro>` — Joue une piste spécifique de la file par son index.\n"
-                "  Utilise `/queue` pour voir les numéros.\n\n"
-                "• `/stop` — Arrête la musique, déconnecte le bot et vide la file.\n"
-                "  L'historique est conservé mais la musique ne sera pas restaurée au redémarrage.\n\n"
-                "• `/skip` ou `/next` — Passe à la piste suivante.\n"
-                "  Si des pistes sont en file, joue la prochaine. Sinon, skip la piste actuelle.\n\n"
-                "• `/previous` — Rejoue la musique précédente.\n"
-                "  L'historique conserve jusqu'à 50 pistes passées.\n\n"
-                "• `/pause` — Met en pause ou reprend la lecture.\n\n"
-                "• `/queue` — Affiche la piste en cours et la file d'attente.\n\n"
-                "• `/volume <0-100>` — Régle le volume.\n"
-                "  0 = muet, 100 = maximum.\n\n"
-                "• `/setdefaultvolume <0-100>` — Définit le volume par défaut.\n"
-                "  Toutes les nouvelles lectures utiliseront ce volume (défaut : 10%).\n\n"
-                "• `/nowplaying` — Affiche la piste en cours avec barre de progression.\n\n"
-                "**Sources supportées :**\n"
-                "Spotify, YouTube, SoundCloud, Bandcamp, Twitch, Vimeo\n\n"
-                "**Fonctionnement :**\n"
-                "• Le bot se connecte automatiquement à ton salon vocal.\n"
-                "• Les pistes ajoutées pendant la lecture vont en file d'attente.\n"
-                "• L'état est sauvegardé automatiquement (toutes les 30s).\n"
-                "• Au redémarrage, la musique est restaurée **seulement si elle était en cours**.\n"
-                "• `/stop` empêche la restauration au prochain redémarrage."
-            ),
-            color=0xFFFFFF,
         )
         await interaction.response.send_message(embed=embed)
 
