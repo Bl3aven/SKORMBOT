@@ -40,3 +40,18 @@ plugins:
       clientId: "${SPOTIFY_CLIENT_ID}"
       clientSecret: "${SPOTIFY_CLIENT_SECRET}"
       preferPartnerApi: false
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: "all"
+    allowDirectPlaylistIds: "all"
+    allowPlaylist: true
+    clientStyle: "IOS"
+    loopingDecipher: true
+    retryCount: 10
+    sources:
+      - "search"
+      - "video"
+      - "playlist"
+    oauth:
+      enabled: false
