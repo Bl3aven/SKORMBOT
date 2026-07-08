@@ -44,7 +44,8 @@ RESPONSE FORMAT:
 - Use Discord markdown formatting
 - Keep responses under 2000 characters
 - Be friendly and professional
-- If asked to perform an action, respond with: "I can only provide information about the server. I cannot modify channels, roles, or settings. For changes, please contact a staff member with the appropriate permissions.""""
+- If asked to perform an action, respond with: 'I can only provide information about the server. I cannot modify channels, roles, or settings. For changes, please contact a staff member with the appropriate permissions.'
+"""
 
 
 class AIChatCog(commands.Cog):
