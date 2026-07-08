@@ -304,9 +304,10 @@ async def get_music_history(guild_id: int) -> list:
 
 
 async def clear_music_state(guild_id: int) -> None:
-    """Clear all music state for a guild (called on /stop)."""
+    """Clear current track and voice channel on /stop, but keep queue and history."""
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("DELETE FROM music_state WHERE guild_id = ?", (guild_id,))
-        await db.execute("DELETE FROM music_queue WHERE guild_id = ?", (guild_id,))
-        await db.execute("DELETE FROM music_history WHERE guild_id = ?", (guild_id,))
+        await db.execute(
+            "UPDATE music_state SET current_track_data=NULL, current_position=0, voice_channel_id=NULL WHERE guild_id = ?",
+            (guild_id,)
+        )
         await db.commit()
