@@ -361,6 +361,9 @@ class MusicCog(commands.Cog):
                     queue.push_history(player.current)
                 await player.play(track)
             else:
+                # Apply default volume when starting playback
+                default_vol = await music_db.get_default_volume(guild.id)
+                await player.set_volume(default_vol)
                 await player.play(track)
 
             await interaction.followup.send(f"🎵 Lecture de la piste #{index} :\n{format_track(track)}")
@@ -393,6 +396,9 @@ class MusicCog(commands.Cog):
                 f"✅ Ajouté à la file :\n{format_track(track, queue.length)}"
             )
         else:
+            # Apply default volume before playing
+            default_vol = await music_db.get_default_volume(guild.id)
+            await player.set_volume(default_vol)
             await player.play(track)
             await interaction.followup.send(
                 f"🎵 En lecture :\n{format_track(track)}"
@@ -553,8 +559,8 @@ class MusicCog(commands.Cog):
         )
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="volume", description="Régle le volume (0-500)")
-    @app_commands.describe(level="Volume de 0 à 500 (100 = normal)")
+    @app_commands.command(name="volume", description="Régle le volume (0-100)")
+    @app_commands.describe(level="Volume de 0 à 100")
     async def volume(self, interaction: discord.Interaction, level: int) -> None:
         guild = interaction.guild
         if guild is None:
@@ -566,9 +572,20 @@ class MusicCog(commands.Cog):
             await interaction.response.send_message("❌ Aucune musique en cours.", ephemeral=True)
             return
 
-        level = max(0, min(500, level))
+        level = max(0, min(100, level))
         await player.set_volume(level)
         await interaction.response.send_message(f"🔊 Volume réglé à {level}%.")
+
+    @app_commands.command(name="setdefaultvolume", description="Définit le volume par défaut pour toutes les lectures (0-100)")
+    @app_commands.describe(level="Volume par défaut de 0 à 100")
+    async def setdefaultvolume(self, interaction: discord.Interaction, level: int) -> None:
+        guild = interaction.guild
+        if guild is None:
+            return
+
+        level = max(0, min(100, level))
+        await music_db.save_default_volume(guild.id, level)
+        await interaction.response.send_message(f"🔊 Volume par défaut réglé à {level}%.")
 
     @app_commands.command(name="nowplaying", description="Affiche la piste en cours")
     async def nowplaying(self, interaction: discord.Interaction) -> None:
@@ -626,8 +643,10 @@ class MusicCog(commands.Cog):
                 "  L'historique conserve jusqu'à 50 pistes passées.\n\n"
                 "• `/pause` — Met en pause ou reprend la lecture.\n\n"
                 "• `/queue` — Affiche la piste en cours et la file d'attente.\n\n"
-                "• `/volume <0-500>` — Régle le volume.\n"
-                "  100 = normal, 0 = muet, 500 = maximum.\n\n"
+                "• `/volume <0-100>` — Régle le volume.\n"
+                "  0 = muet, 100 = maximum.\n\n"
+                "• `/setdefaultvolume <0-100>` — Définit le volume par défaut.\n"
+                "  Toutes les nouvelles lectures utiliseront ce volume (défaut : 10%).\n\n"
                 "• `/nowplaying` — Affiche la piste en cours avec barre de progression.\n\n"
                 "**Sources supportées :**\n"
                 "Spotify, YouTube, SoundCloud, Bandcamp, Twitch, Vimeo\n\n"

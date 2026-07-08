@@ -76,6 +76,11 @@ CREATE TABLE IF NOT EXISTS music_history (
     track_data TEXT NOT NULL,
     FOREIGN KEY (guild_id) REFERENCES music_state(guild_id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS music_settings (
+    guild_id INTEGER PRIMARY KEY,
+    default_volume INTEGER NOT NULL DEFAULT 10
+);
 """
 
 
@@ -311,3 +316,24 @@ async def clear_music_state(guild_id: int) -> None:
             (guild_id,)
         )
         await db.commit()
+
+
+async def save_default_volume(guild_id: int, volume: int) -> None:
+    """Save default volume for a guild."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO music_settings (guild_id, default_volume) VALUES (?, ?)",
+            (guild_id, volume)
+        )
+        await db.commit()
+
+
+async def get_default_volume(guild_id: int) -> int:
+    """Get default volume for a guild, returns 10 if not set."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "SELECT default_volume FROM music_settings WHERE guild_id = ?",
+            (guild_id,)
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else 10
