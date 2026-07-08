@@ -586,8 +586,8 @@ class VoiceRecordCog(commands.Cog):
             return
 
         # Check permissions (bot needs to connect to voice)
-        bot_member = guild.me
-        if not bot_member.voice_permissions.connect:
+        # Use the voice channel's permissions for the bot member
+        if not voice_channel.permissions_for(guild.me).connect:
             await interaction.followup.send(
                 embed=create_embed(
                     title="❌ Missing Permissions",
