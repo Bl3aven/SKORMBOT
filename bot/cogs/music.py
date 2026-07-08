@@ -608,6 +608,40 @@ class MusicCog(commands.Cog):
         )
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="helpmusic", description="Affiche l'aide complète du système musical")
+    async def helpmusic(self, interaction: discord.Interaction) -> None:
+        embed = create_embed(
+            title=f"🎵 Aide — Musique {BRAND_NAME}",
+            description=(
+                "**Commandes disponibles :**\n\n"
+                "• `/play <url>` — Joue une musique (Spotify, YouTube, SoundCloud, etc.)\n"
+                "  Si une musique est déjà en cours, la piste est ajoutée à la file d'attente.\n\n"
+                "• `/play <numéro>` — Joue une piste spécifique de la file par son index.\n"
+                "  Utilise `/queue` pour voir les numéros.\n\n"
+                "• `/stop` — Arrête la musique, déconnecte le bot et vide la file.\n"
+                "  L'historique est conservé mais la musique ne sera pas restaurée au redémarrage.\n\n"
+                "• `/skip` ou `/next` — Passe à la piste suivante.\n"
+                "  Si des pistes sont en file, joue la prochaine. Sinon, skip la piste actuelle.\n\n"
+                "• `/previous` — Rejoue la musique précédente.\n"
+                "  L'historique conserve jusqu'à 50 pistes passées.\n\n"
+                "• `/pause` — Met en pause ou reprend la lecture.\n\n"
+                "• `/queue` — Affiche la piste en cours et la file d'attente.\n\n"
+                "• `/volume <0-500>` — Régle le volume.\n"
+                "  100 = normal, 0 = muet, 500 = maximum.\n\n"
+                "• `/nowplaying` — Affiche la piste en cours avec barre de progression.\n\n"
+                "**Sources supportées :**\n"
+                "Spotify, YouTube, SoundCloud, Bandcamp, Twitch, Vimeo\n\n"
+                "**Fonctionnement :**\n"
+                "• Le bot se connecte automatiquement à ton salon vocal.\n"
+                "• Les pistes ajoutées pendant la lecture vont en file d'attente.\n"
+                "• L'état est sauvegardé automatiquement (toutes les 30s).\n"
+                "• Au redémarrage, la musique est restaurée **seulement si elle était en cours**.\n"
+                "• `/stop` empêche la restauration au prochain redémarrage."
+            ),
+            color=0xFFFFFF,
+        )
+        await interaction.response.send_message(embed=embed)
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(MusicCog(bot))
