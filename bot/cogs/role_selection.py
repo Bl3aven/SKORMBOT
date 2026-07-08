@@ -151,13 +151,13 @@ class RoleSelectionCog(commands.Cog):
             if channel is None:
                 continue
 
-            # Find ALL existing role selection messages
+            # Find ALL existing role selection messages (French or old English title)
             existing_messages = []
             async for message in channel.history(limit=50):
                 if (
                     message.author == self.bot.user
                     and message.embeds
-                    and message.embeds[0].title == "🌩️ Choisis ton parcours"
+                    and message.embeds[0].title in ("🌩️ Choisis ton parcours", "🌩️ Choose Your Path")
                 ):
                     existing_messages.append(message)
 
