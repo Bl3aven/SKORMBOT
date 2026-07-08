@@ -29,6 +29,68 @@ from bot.cogs import db as music_db
 log = logging.getLogger("skorm.music")
 
 
+class SearchButtonView(discord.ui.View):
+    """Persistent view for search result buttons."""
+
+    def __init__(self, cog: 'MusicCog') -> None:
+        super().__init__(timeout=None)
+        self.cog = cog
+
+    @discord.ui.button(label="1", style=discord.ButtonStyle.secondary, custom_id="skorm_search_0")
+    async def btn_0(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self._handle_selection(interaction, 0)
+
+    @discord.ui.button(label="2", style=discord.ButtonStyle.secondary, custom_id="skorm_search_1")
+    async def btn_1(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self._handle_selection(interaction, 1)
+
+    @discord.ui.button(label="3", style=discord.ButtonStyle.secondary, custom_id="skorm_search_2")
+    async def btn_2(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self._handle_selection(interaction, 2)
+
+    @discord.ui.button(label="4", style=discord.ButtonStyle.secondary, custom_id="skorm_search_3")
+    async def btn_3(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self._handle_selection(interaction, 3)
+
+    @discord.ui.button(label="5", style=discord.ButtonStyle.secondary, custom_id="skorm_search_4")
+    async def btn_4(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self._handle_selection(interaction, 4)
+
+    @discord.ui.button(label="❌ Annuler", style=discord.ButtonStyle.danger, custom_id="skorm_search_cancel")
+    async def btn_cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        msg_id = interaction.message.id
+        self.cog._search_results.pop(msg_id, None)
+        self.cog._search_users.pop(msg_id, None)
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(view=self)
+
+    async def _handle_selection(self, interaction: discord.Interaction, index: int) -> None:
+        msg_id = interaction.message.id
+        tracks = self.cog._search_results.get(msg_id)
+        owner_id = self.cog._search_users.get(msg_id)
+
+        if tracks is None:
+            await interaction.response.send_message("❌ Résultats expirés. Relance la recherche.", ephemeral=True)
+            return
+
+        if owner_id and interaction.user.id != owner_id:
+            await interaction.response.send_message("❌ Ce bouton n'est pas pour toi.", ephemeral=True)
+            return
+
+        if index >= len(tracks):
+            await interaction.response.send_message("❌ Piste invalide.", ephemeral=True)
+            return
+
+        track = tracks[index]
+        # Clean up
+        self.cog._search_results.pop(msg_id, None)
+        self.cog._search_users.pop(msg_id, None)
+
+        await interaction.response.defer(ephemeral=True)
+        await self.cog._play_track(interaction, track)
+
+
 class MusicQueue:
     """Per-guild music queue wrapper with history support."""
 
@@ -112,6 +174,9 @@ class MusicCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self._save_task = None
+        # Store search results in memory keyed by message_id
+        self._search_results: dict[int, list] = {}
+        self._search_users: dict[int, int] = {}  # message_id -> user_id
 
     def cog_unload(self) -> None:
         _queues.clear()
@@ -121,9 +186,8 @@ class MusicCog(commands.Cog):
     async def cog_load(self) -> None:
         """Start periodic state save task."""
         self._save_task = asyncio.create_task(self._periodic_save())
-        # Store search results in memory keyed by message_id
-        self._search_results: dict[int, list] = {}
-        self._search_users: dict[int, int] = {}  # message_id -> user_id
+        # Register persistent view for search buttons
+        self.bot.add_view(SearchButtonView(self))
 
     async def _periodic_save(self) -> None:
         """Save music state every 30 seconds."""
@@ -338,54 +402,8 @@ class MusicCog(commands.Cog):
         # Save state
         await self._save_state(guild.id)
 
-    @commands.Cog.listener("on_interaction")
-    async def on_interaction(self, interaction: discord.Interaction) -> None:
-        """Handle search button clicks via persistent custom_id."""
-        if not isinstance(interaction, discord.ComponentInteraction):
-            return
-        custom_id = interaction.data.get("custom_id", "")
-        if not custom_id.startswith("skorm:search:"):
-            return
-
-        msg_id = interaction.message.id
-        tracks = self._search_results.get(msg_id)
-        owner_id = self._search_users.get(msg_id)
-
-        if tracks is None:
-            await interaction.response.send_message("❌ Résultats expirés. Relance la recherche.", ephemeral=True)
-            return
-
-        if owner_id and interaction.user.id != owner_id:
-            await interaction.response.send_message("❌ Ce bouton n'est pas pour toi.", ephemeral=True)
-            return
-
-        if custom_id == "skorm:search:cancel":
-            self._search_results.pop(msg_id, None)
-            self._search_users.pop(msg_id, None)
-            for child in interaction.message.components[0].children:
-                child.disabled = True
-            await interaction.response.edit_message(content="🔍 Recherche annulée.", components=interaction.message.components)
-            return
-
-        # Extract index
-        try:
-            index = int(custom_id.split(":")[2])
-        except (IndexError, ValueError):
-            return
-
-        if index >= len(tracks):
-            return
-
-        track = tracks[index]
-        # Clean up
-        self._search_results.pop(msg_id, None)
-        self._search_users.pop(msg_id, None)
-
-        await interaction.response.defer(ephemeral=True)
-        await self._play_track(interaction, track)
-
     async def _show_search_results(self, interaction: discord.Interaction, tracks: list) -> None:
-        """Show search results with buttons."""
+        """Show search results with persistent buttons."""
         # Build embed with top 5 results
         lines = []
         for i, track in enumerate(tracks[:5], start=1):
@@ -401,23 +419,12 @@ class MusicCog(commands.Cog):
         )
         embed.add_field(name="💡 Conseil", value="Clique sur un bouton pour jouer la piste sélectionnée.", inline=False)
 
-        # Build view with persistent buttons
-        view = discord.ui.View(timeout=120)
-        emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
-        for i, track in enumerate(tracks[:5]):
-            button = discord.ui.Button(
-                label=f"{emojis[i]} {track.title[:20]}...",
-                style=discord.ButtonStyle.secondary,
-                custom_id=f"skorm:search:{i}",
-            )
-            view.add_item(button)
-
-        cancel = discord.ui.Button(
-            label="❌ Annuler",
-            style=discord.ButtonStyle.danger,
-            custom_id="skorm:search:cancel",
-        )
-        view.add_item(cancel)
+        # Use persistent view
+        view = SearchButtonView(self)
+        # Disable buttons beyond available tracks
+        for i in range(len(tracks[:5]), 5):
+            view.children[i].disabled = True
+            view.children[i].style = discord.ButtonStyle.secondary
 
         msg = await interaction.followup.send(embed=embed, view=view)
 
