@@ -214,9 +214,6 @@ class VoiceRecordCog(commands.Cog):
         except discord.Forbidden:
             log.error("Forbidden: bot lacks permission to join %s. Check role permissions on the channel/category.", channel.name)
             return None
-        except discord.InvalidArgument as e:
-            log.error("InvalidArgument joining %s: %s", channel.name, e)
-            return None
         except Exception as e:
             log.error("Failed to join voice channel %s: %s (%s)", channel.name, type(e).__name__, e)
             return None
