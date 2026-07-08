@@ -343,6 +343,9 @@ class VoiceRecordCog(commands.Cog):
                     await session.add_opus_packet(speaker_id, opus_data)
                     packets_count += 1
 
+                    # Yield to event loop so Discord gateway can process commands
+                    await asyncio.sleep(0)
+
                     # Update status message every 10 seconds
                     now = time.time()
                     if now - last_update > 10 and session.status_message:
