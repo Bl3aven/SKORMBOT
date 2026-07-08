@@ -16,6 +16,7 @@ from typing import Optional
 import aiohttp
 import discord
 import numpy as np
+import opuslib
 from discord import app_commands
 from discord.ext import commands
 
