@@ -35,6 +35,13 @@ SUSPICIOUS_DOMAINS = (
 )
 
 
+# === Slash command group (must be module-level for proper sync) ===
+mod_group = app_commands.Group(
+    name="mod",
+    description="Moderation commands.",
+)
+
+
 class ModerationCog(commands.Cog):
     """Staff and direction moderation tools."""
 
@@ -91,12 +98,7 @@ class ModerationCog(commands.Cog):
                     reason=message.content[:256] or None,
                 )
 
-    # --- Slash commands ---
-    mod_group = app_commands.Group(
-        name="mod",
-        description="Moderation commands.",
-    )
-
+    # --- Slash commands (mod_group is module-level) ---
     @mod_group.command(name="warn", description="Warns a member.")
     @app_commands.describe(user="Member to warn", reason="Reason")
     async def warn(
