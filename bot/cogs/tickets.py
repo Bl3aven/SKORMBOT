@@ -23,7 +23,7 @@ log = logging.getLogger("skorm.tickets")
 
 SUPPORT_CHANNEL_NAME = "│support"
 LOGS_CHANNEL_NAME = "│mod-logs"
-TICKETS_CATEGORY_NAME = "Tickets"
+TICKETS_CATEGORY_ID = 1523995159665053746
 OPEN_TICKET_TITLE = "🎫 Support SKORM"
 
 
@@ -231,18 +231,12 @@ class TicketsCog(commands.Cog):
             except Exception as exc:
                 log.error("Failed to post open-ticket message: %s", exc)
 
-    async def _get_or_create_category(self, guild: discord.Guild) -> Optional[discord.CategoryChannel]:
-        for category in guild.categories:
-            if category.name == TICKETS_CATEGORY_NAME:
-                return category
-        try:
-            return await guild.create_category(
-                name=TICKETS_CATEGORY_NAME,
-                reason="SKORM tickets",
-            )
-        except Exception as exc:
-            log.error("Failed to create tickets category: %s", exc)
-            return None
+    async def _get_ticket_category(self, guild: discord.Guild) -> Optional[discord.CategoryChannel]:
+        category = guild.get_channel(TICKETS_CATEGORY_ID)
+        if isinstance(category, discord.CategoryChannel):
+            return category
+        log.warning("Tickets category %s not found in %s", TICKETS_CATEGORY_ID, guild.name)
+        return None
 
     def _build_overwrites(
         self, guild: discord.Guild, member: discord.Member
@@ -287,10 +281,10 @@ class TicketsCog(commands.Cog):
             )
             return
 
-        category = await self._get_or_create_category(guild)
+        category = await self._get_ticket_category(guild)
         if category is None:
             await interaction.followup.send(
-                "❌ Could not create tickets category.", ephemeral=True
+                "❌ Tickets category not found.", ephemeral=True
             )
             return
 
