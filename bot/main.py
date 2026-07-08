@@ -45,6 +45,7 @@ COGS = [
     "bot.cogs.moderation",
     "bot.cogs.music",
     "bot.cogs.ai_chat",
+    "bot.cogs.voice_record",
 ]
 
 

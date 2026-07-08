@@ -51,3 +51,7 @@ LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD", "skorm")
 OXEEGEN_API_ENDPOINT = os.getenv("OXEEGEN_API_ENDPOINT", "https://inference-04.oxeegen.com/v1")
 OXEEGEN_API_KEY = os.getenv("OXEEGEN_API_KEY")
 OXEEGEN_MODEL = os.getenv("OXEEGEN_MODEL", "Oxee-flash")
+
+# === Moonshine STT (Voice Recording) ===
+MOONSHINE_VOICE_CACHE = os.getenv("MOONSHINE_VOICE_CACHE", "/app/data/moonshine_cache")
+os.environ["MOONSHINE_VOICE_CACHE"] = MOONSHINE_VOICE_CACHE
