@@ -363,9 +363,8 @@ class ModerationCog(commands.Cog):
             ephemeral=True,
         )
 
-    # === /cleanchat command ===
-    @app_commands.command(name="cleanchat", description="Cleans all message history in the current channel.")
-    async def cleanchat(self, interaction: discord.Interaction) -> None:
+    # === /cleanchat command implementation (registered explicitly in setup) ===
+    async def cleanchat_impl(self, interaction: discord.Interaction) -> None:
         if not isinstance(interaction.user, discord.Member):
             await interaction.response.send_message("❌ AdminDiscord role required.", ephemeral=True)
             return
@@ -379,20 +378,29 @@ class ModerationCog(commands.Cog):
             await interaction.response.send_message("❌ This command only works in text channels.", ephemeral=True)
             return
 
-        await interaction.response.send_message(
-            embed=create_embed(
-                title="🧹 Clean Chat",
-                description=(
-                    f"This will delete **all messages** in {channel.mention}.\n\n"
-                    "This action is **irreversible**.\n\n"
-                    "Confirm below to proceed."
+        view = CleanChatView(interaction.user.id)
+        try:
+            await interaction.response.send_message(
+                embed=create_embed(
+                    title="🧹 Clean Chat",
+                    description=(
+                        f"This will delete **all messages** in {channel.mention}.\n\n"
+                        "This action is **irreversible**.\n\n"
+                        "Confirm below to proceed."
+                    ),
+                    color=0xFF0000,
                 ),
-                color=0xFF0000,
-            ),
-            view=CleanChatView(interaction.user.id),
-        )
+                view=view,
+            )
+        except Exception:
+            log.exception("Failed to send cleanchat confirmation message")
+            try:
+                await interaction.followup.send("❌ Unable to show confirmation UI.", ephemeral=True)
+            except Exception:
+                pass
+            return
 
-        view: CleanChatView = interaction.response.message.view
+        # Wait for the user's confirmation via the view we created above.
         await view.wait()
 
         if not view.value:
@@ -402,22 +410,68 @@ class ModerationCog(commands.Cog):
         deleted = 0
         errors = 0
 
-        async for msg in channel.history(limit=None, oldest_first=False):
-            if msg.id == status_msg.id:
-                continue
-            if msg.system:
-                continue
+        # Use bulk-delete for recent messages (faster) and individual deletes
+        # for messages older than 14 days (not supported by bulk delete).
+        now = discord.utils.utcnow()
+        cutoff = now - timedelta(days=14)
+
+        while True:
+            # Fetch a batch of messages (most recent first)
+            batch = [m async for m in channel.history(limit=100, oldest_first=False)]
+            if not batch:
+                break
+
+            # Remove our status message from the batch if present
+            batch = [m for m in batch if m.id != status_msg.id]
+            if not batch:
+                break
+
+            # Unpin any pinned messages so they become deletable
+            for m in list(batch):
+                if getattr(m, "pinned", False):
+                    try:
+                        await m.unpin()
+                    except Exception:
+                        pass
+
+            recent = [m for m in batch if m.created_at and m.created_at > cutoff]
+            old = [m for m in batch if m not in recent]
+
+            # Bulk delete recent messages (up to 100)
+            if recent:
+                try:
+                    await channel.delete_messages(recent)
+                    deleted += len(recent)
+                except Exception:
+                    # Fallback to individual deletion on any failure
+                    for m in recent:
+                        try:
+                            await m.delete()
+                            deleted += 1
+                        except Exception:
+                            errors += 1
+                            await asyncio.sleep(1)
+
+            # Individually delete older messages
+            for m in old:
+                try:
+                    await m.delete()
+                    deleted += 1
+                    if deleted % 100 == 0:
+                        await status_msg.edit(content=f"⏳ Cleaning channel… ({deleted} deleted)")
+                        await asyncio.sleep(1)
+                except discord.Forbidden:
+                    errors += 1
+                except discord.HTTPException:
+                    errors += 1
+                    await asyncio.sleep(2)
+
+            # Update status and continue until channel empty
             try:
-                await msg.delete()
-                deleted += 1
-                if deleted % 100 == 0:
-                    await status_msg.edit(content=f"⏳ Cleaning channel… ({deleted} deleted)")
-                    await asyncio.sleep(1)
-            except discord.Forbidden:
-                errors += 1
-            except discord.HTTPException:
-                errors += 1
-                await asyncio.sleep(2)
+                await status_msg.edit(content=f"⏳ Cleaning channel… ({deleted} deleted)")
+            except Exception:
+                pass
+            await asyncio.sleep(0.6)
 
         await status_msg.edit(content=(
             f"✅ **Channel cleaned!**\n\n"
@@ -470,4 +524,19 @@ class CleanChatView(discord.ui.View):
 
 
 async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(ModerationCog(bot))
+    cog = ModerationCog(bot)
+    await bot.add_cog(cog)
+
+    # Ensure a root /cleanchat command is registered (bound to the cog instance).
+    async def _cleanchat(interaction: discord.Interaction) -> None:
+        await cog.cleanchat_impl(interaction)
+
+    cmd = app_commands.Command(
+        name="cleanchat",
+        description="Cleans all message history in the current channel.",
+        callback=_cleanchat,
+    )
+    try:
+        bot.tree.add_command(cmd)
+    except Exception as e:
+        log.warning(f"Failed to add root cleanchat command: {e}")

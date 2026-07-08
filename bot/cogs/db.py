@@ -81,6 +81,17 @@ CREATE TABLE IF NOT EXISTS music_settings (
     guild_id INTEGER PRIMARY KEY,
     default_volume INTEGER NOT NULL DEFAULT 10
 );
+
+CREATE TABLE IF NOT EXISTS chat_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    channel_id INTEGER,
+    guild_id INTEGER,
+    message TEXT NOT NULL,
+    response TEXT NOT NULL,
+    context_summary TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -337,3 +348,44 @@ async def get_default_volume(guild_id: int) -> int:
         )
         row = await cursor.fetchone()
         return row[0] if row else 10
+
+
+# === Chat History ===
+async def save_chat_entry(user_id: int, channel_id: int, guild_id: int,
+                          message: str, response: str, context_summary: str = None) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "INSERT INTO chat_history (user_id, channel_id, guild_id, message, response, context_summary) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, channel_id, guild_id, message, response, context_summary),
+        )
+        await db.commit()
+        return cursor.lastrowid
+
+
+async def get_chat_context(user_id: int, limit: int = 5):
+    """Get recent chat history for a user to provide conversation context."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT message, response FROM chat_history "
+            "WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit),
+        )
+        return await cursor.fetchall()
+
+
+async def get_server_stats(guild_id: int):
+    """Get aggregated server stats for AI context."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        tickets = await db.execute_scalar("SELECT COUNT(*) FROM tickets")
+        open_tickets = await db.execute_scalar("SELECT COUNT(*) FROM tickets WHERE status='open'")
+        warnings_count = await db.execute_scalar("SELECT COUNT(*) FROM warnings")
+        events = await db.execute_scalar("SELECT COUNT(*) FROM events")
+
+        return {
+            "total_tickets": tickets,
+            "open_tickets": open_tickets,
+            "total_warnings": warnings_count,
+            "total_events": events,
+        }

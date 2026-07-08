@@ -44,6 +44,7 @@ COGS = [
     "bot.cogs.reminders",
     "bot.cogs.moderation",
     "bot.cogs.music",
+    "bot.cogs.ai_chat",
 ]
 
 

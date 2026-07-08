@@ -46,3 +46,8 @@ FOOTER_TEXT = "SKORM — CREATE. CONNECT. DEVELOP."
 LAVALINK_HOST = os.getenv("LAVALINK_HOST", "lavalink")
 LAVALINK_PORT = int(os.getenv("LAVALINK_PORT", "2333"))
 LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD", "skorm")
+
+# === Oxeegen AI API ===
+OXEEGEN_API_ENDPOINT = os.getenv("OXEEGEN_API_ENDPOINT", "https://inference-04.oxeegen.com/v1")
+OXEEGEN_API_KEY = os.getenv("OXEEGEN_API_KEY")
+OXEEGEN_MODEL = os.getenv("OXEEGEN_MODEL", "Oxee-flash")
