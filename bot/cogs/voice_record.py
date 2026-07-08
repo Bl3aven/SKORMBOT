@@ -145,7 +145,7 @@ class VoiceRecordCog(commands.Cog):
                 await self._end_recording(guild_id, reason="Bot shutting down")
 
     @commands.Cog.listener()
-    async def on_voice_receive(self, voice_packet: discord.VoicePacket) -> None:
+    async def on_voice_receive(self, voice_packet) -> None:
         """
         Called in a separate thread when a voice packet arrives.
         Thread-safe: only enqueue, never await anything here.
