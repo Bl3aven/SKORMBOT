@@ -38,7 +38,7 @@ COGS = [
     "bot.cogs.setup",
     "bot.cogs.welcome",
     "bot.cogs.role_selection",
-    "bot.cogs.tickets",
+    # "bot.cogs.tickets"  — DISABLED: ticket system creates/modifies channels, categories, and permissions
     "bot.cogs.logging_cog",
     "bot.cogs.antispam",
     "bot.cogs.reminders",
@@ -48,6 +48,7 @@ COGS = [
     "bot.cogs.image_generation",
     "bot.cogs.video_generation",
     "bot.cogs.voice_record",
+    "bot.cogs.health",
 ]
 
 
@@ -103,20 +104,8 @@ async def on_ready() -> None:
     except Exception as exc:
         log.error("Database initialisation failed: %s", exc)
 
-    # Auto-apply permissions on startup
-    try:
-        guild = bot.get_guild(SERVER_ID) if SERVER_ID else None
-        if guild:
-            setup_cog = bot.get_cog("SetupCog")
-            if setup_cog:
-                log.info("Auto-applying permissions to guild %s", guild.name)
-                role_map = {r.name: r for r in guild.roles}
-                category_map = {c.name: c for c in guild.categories}
-                await setup_cog._apply_permissions(guild, category_map, role_map)
-                await setup_cog._secure_voice_channels(guild, role_map, {"errors": []})
-                log.info("Permissions auto-applied successfully")
-    except Exception as exc:
-        log.error("Failed to auto-apply permissions: %s", exc)
+    # Auto-apply permissions on startup — DISABLED (permissions should not be reset on every restart)
+    pass
 
     # Sync slash commands (guild scope when SERVER_ID is configured, global otherwise)
     try:

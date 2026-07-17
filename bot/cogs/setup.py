@@ -245,12 +245,13 @@ class SetupCog(commands.Cog):
             "\n".join(lines[:1000]), ephemeral=True
         )
 
-    @app_commands.command(
-        name="setup",
-        description="Creates the entire SKORM structure (owner only).",
-    )
-    @app_commands.checks.has_permissions(administrator=True)
-    @app_commands.describe(clean="Deletes old channels and orphan categories.")
+    # /setup command disabled — channels/categories/permissions must not be modified via Discord commands
+    # @app_commands.command(
+    #     name="setup",
+    #     description="Creates the entire SKORM structure (owner only).",
+    # )
+    # @app_commands.checks.has_permissions(administrator=True)
+    # @app_commands.describe(clean="Deletes old channels and orphan categories.")
     async def setup(
         self, interaction: discord.Interaction, clean: bool = False
     ) -> None:
@@ -304,7 +305,8 @@ class SetupCog(commands.Cog):
         await interaction.edit_original_response(
             content="⏳ Applying permissions…"
         )
-        await self._apply_permissions(guild, category_map, created_roles)
+        # Permissions management disabled — should not modify channel permissions automatically
+        # await self._apply_permissions(guild, category_map, created_roles)
 
         # 5. Hierarchy
         await interaction.edit_original_response(
@@ -316,7 +318,9 @@ class SetupCog(commands.Cog):
         await interaction.edit_original_response(
             content="⏳ Securing voice channels…"
         )
-        voice_secured = await self._secure_voice_channels(guild, created_roles, report)
+        # Permissions management disabled — should not modify voice channel permissions automatically
+        # voice_secured = await self._secure_voice_channels(guild, created_roles, report)
+        voice_secured = 0  # placeholder
 
         # 7. Confirmation
         summary = (
