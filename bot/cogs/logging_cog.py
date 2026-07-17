@@ -1,9 +1,7 @@
 """
 SKORMAgency - Logging cog
 Logs moderation events, deleted/edited messages and role changes to mod-logs.
-Also auto-secures new voice channels.
 """
-import asyncio
 import logging
 from datetime import datetime
 from typing import Optional
@@ -165,38 +163,6 @@ class LoggingCog(commands.Cog):
             user=self.bot.user,
             channel=channel,
         )
-
-        # Auto-secure new voice channels
-        if isinstance(channel, discord.VoiceChannel):
-            await self._secure_voice_channel(channel)
-
-    async def _secure_voice_channel(self, channel: discord.VoiceChannel) -> None:
-        """Apply restrictive permissions to a voice channel for user roles."""
-        DENY_PERMS = [
-            "manage_channels", "manage_webhooks",
-            "deafen_members", "move_members", "priority_speaker",
-            "mention_everyone", "manage_messages",
-        ]
-
-        guild = channel.guild
-        from bot.cogs.utils import DIRECTION_ROLES, STAFF_ROLES
-        ADMIN_ROLES = DIRECTION_ROLES | STAFF_ROLES
-
-        def deny_overwrite():
-            ow = discord.PermissionOverwrite()
-            for perm in DENY_PERMS:
-                setattr(ow, perm, False)
-            return ow
-
-        try:
-            ow = {guild.default_role: deny_overwrite()}
-            for role in guild.roles:
-                if role.name in ADMIN_ROLES or role.is_default():
-                    continue
-                ow[role] = deny_overwrite()
-            await channel.edit(overwrites=ow, reason="SKORM voice security (auto)")
-        except Exception as exc:
-            log.warning("Failed to auto-secure voice channel %s: %s", channel.name, exc)
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel) -> None:

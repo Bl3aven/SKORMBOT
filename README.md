@@ -20,6 +20,9 @@ minimaliste, expérience fluide.
 | 🚨 **Anti-spam** | Timeout 5 min si > 5 msg / 3 s, anti-mass-mention, anti-raid. |
 | ⏰ **Reminders** | Rappels personnels (`/remind set 30m …`) + événements Discord avec notifications H-24 et H-1. |
 | 🛡️ **Moderation** | `/mod warn`, `mute`, `kick`, `ban`, `unmute`, `warnings` + auto-delete liens suspects. |
+| 🎵 **Music** | Player Lavalink : `/play` accepte URLs directes, vérifie Spotify OAuth, fallback par métadonnées publiques, suggestions d'autocomplete et recherches texte avec menu de sélection ; volume par défaut configurable avec `/volumedefaut` ; reprise automatique de la piste, de la position et de la file après redémarrage. |
+| 🖼️ **Images** | `/createimage` génère ou modifie une image via MOODBEAST/ComfyUI avec profils `rapide`, `standard` et `qualite`. |
+| 🎬 **Vidéos** | `/createvideo` lance une génération image-to-video MOODBEAST/ComfyUI, libère la VRAM via le GPU switcher et renvoie un lien Nextcloud. |
 
 ---
 
@@ -127,6 +130,20 @@ est déjà configuré).
 | `BOT_TOKEN` | Token Discord du bot | `MTx5b3VyLnRva2VuPg…` |
 | `SERVER_ID` | ID du serveur Discord | `123456789012345678` |
 | `OWNER_ID` | Ton ID Discord (autorise `/setup`) | `123456789012345678` |
+| `LAVALINK_HOST` | Host Lavalink | `lavalink` |
+| `LAVALINK_PORT` | Port Lavalink | `2333` |
+| `LAVALINK_PASSWORD` | Mot de passe Lavalink | `skorm` |
+| `SPOTIFY_CLIENT_ID` | Client ID Spotify dédié au bot | `xxxxxxxx` |
+| `SPOTIFY_CLIENT_SECRET` | Client Secret Spotify dédié au bot | `xxxxxxxx` |
+| `COMFYUI_IMAGE_API_ENDPOINT` | Endpoint image MOODBEAST OpenAI-compatible | `http://192.168.1.210:8091/v1` |
+| `COMFYUI_IMAGE_API_KEY` | Clé API `mood-inference-api` | `xxxxxxxx` |
+| `COMFYUI_IMAGE_QUALITY` | Profil image par défaut | `standard` |
+| `COMFYUI_VIDEO_API_ENDPOINT` | Endpoint vidéo MOODBEAST OpenAI-compatible | `https://inference.tournayre.ovh/v1` |
+| `COMFYUI_VIDEO_API_KEY` | Clé API `mood-inference-api` pour `/createvideo` | `xxxxxxxx` |
+| `COMFYUI_VIDEO_MODEL` | Modèle vidéo exposé par MOODBEAST | `moodvideo` |
+| `COMFYUI_VIDEO_TIMEOUT_SECONDS` | Timeout maximal de rendu/polling vidéo | `7200` |
+| `COMFYUI_VIDEO_POLL_SECONDS` | Intervalle de polling du job vidéo | `10` |
+| `COMFYUI_VIDEO_MAX_IMAGE_BYTES` | Taille maximale image de référence | `25165824` |
 
 Le token doit rester **secret** :
 - En local : `.env` ignoré par Git (`.gitignore`)
@@ -162,6 +179,14 @@ Le token doit rester **secret** :
 | `/remind list` | Liste des rappels actifs. |
 | `/remind delete id` | Supprime un rappel. |
 | `/event create name "2026-12-31 20:00"` | Crée un événement Discord. |
+| `/play <url ou recherche> [debut]` | Lance une URL directement, teste OAuth pour Spotify, tente un fallback titre/artiste si le lien échoue, ou propose les meilleurs résultats d'une recherche texte. `debut` accepte `90s`, `1m30s`, `2:15`, `1:02:03`. |
+| `/queue`, `/nowplaying`, `/pause`, `/skip`, `/stop` | Contrôle la lecture Lavalink. |
+| `/volume <niveau>` | Règle le volume de la lecture en cours. |
+| `/volumedefaut <niveau>` | Définit le volume par défaut des nouvelles lectures (20 par défaut). |
+| `/createimage <prompt> [image] [force] [qualite]` | Génère une image ou modifie un fichier image. `qualite` accepte `rapide`, `standard` ou `qualite`; `force` règle l'intensité d'édition de 0.1 à 1.0. |
+| `/createvideo <prompt> <image> [duree] [qualite]` | Génère une vidéo 9:16 à partir d'une image de référence via MOODBEAST/ComfyUI. Réservé au owner ou au rôle `AdminDiscord`; `duree` accepte 12 ou 15 secondes, `qualite` accepte `premium` (Wan2.2 14B puis fallback) ou `fiable` (Wan2.2 5B). Le résultat est hébergé sur Nextcloud, jamais uploadé en pièce jointe Discord. |
+
+L'état musique est sauvegardé en SQLite toutes les 10 secondes et lors des actions de contrôle : piste courante, position, pause, volume, salon vocal, file d'attente et historique récent.
 
 ---
 

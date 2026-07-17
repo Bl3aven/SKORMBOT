@@ -12,9 +12,12 @@
 |---------|--------|-------|
 | Bot Discord | ✅ Online | BleavenBOT#3775, connecté au gateway |
 | Lavalink | ✅ Connecté | YouTube plugin + LavaSrc chargés |
-| `/play` (YouTube) | ✅ OK | Recherche texte via `ytsearch:` fallback |
+| `/play` (YouTube) | ✅ OK | URL directe, autocomplete, fallback SoundCloud, sélection de résultats via `ytsearch:` et départ optionnel `debut` |
 | `/play` (SoundCloud) | ✅ OK | URL SoundCloud fonctionnelle |
+| `/play` (Spotify) | ✅ OK | App Spotify `SKORMBOT`, OAuth client credentials validé, LavaSrc résout les URLs Spotify |
 | `/nowplaying`, `/queue`, `/skip` | ✅ OK | Commandes de file fonctionnelles |
+| `/play debut`, `/volume`, `/volumedefaut` | ✅ OK | Départ optionnel précis + volume de session + volume par défaut persistant à 20 |
+| Reprise après restart | ✅ OK | Piste courante, position, pause, volume, salon vocal, file et historique sauvegardés/restaurés |
 | `/stoprecord` | ✅ Répond | Plus de timeout (event loop fixé) |
 | Slash commands | ✅ Sync | 20 commandes syncées |
 | Moonshine STT | ✅ Chargé | Medium Streaming model, CPU-only |
@@ -23,30 +26,30 @@
 
 ## ❌ Bloqué
 
-### 1. Spotify — Clés API invalides
+### 1. Spotify — Clés API invalides ✅ Résolu
 
-**Problème** : Lavalink retourne `invalid_client` / `400 Bad Request` sur l'OAuth Spotify.
+**Problème initial** : Lavalink retournait `invalid_client` / `400 Bad Request` sur l'OAuth Spotify.
 
-**Cause** : L'app Spotify "Max" (Client ID: `8135bad63143448190f458e0587ba33f`) est configurée pour Home Assistant (OAuth avec redirect URIs). Le flow **client credentials** que LavaSrc utilise ne fonctionne pas avec cette app.
+**Cause** : L'app Spotify existante est configurée pour Home Assistant (OAuth avec redirect URIs). Le flow **client credentials** que LavaSrc utilise ne fonctionne pas avec cette app.
 
-**Test effectué** :
+**Test initial** :
 ```
 curl -X POST https://accounts.spotify.com/api/token \
-  -u "8135bad63143448190f458e0587ba33f:24fec0ef2f0448fd8f7d488514792a2d2" \
+  -u "<client_id>:<client_secret>" \
   -d "grant_type=client_credentials"
 → HTTP 400 Bad Request
 ```
 
-**Solution** : Créer une **nouvelle app Spotify** dédiée au bot Discord :
-1. https://developer.spotify.com/dashboard → **Create app**
-2. Nom : `SKORMBOT`
-3. Récupérer Client ID + Client Secret
-4. Mettre à jour `/opt/skorm-bot/.env` :
-   ```
-   SPOTIFY_CLIENT_ID=<nouveau>
-   SPOTIFY_CLIENT_SECRET=<nouveau>
-   ```
-5. `docker compose restart lavalink`
+**Correction appliquée** :
+1. Création d'une app Spotify Developer dédiée : `SKORMBOT`
+2. Mise à jour de `/opt/skorm-bot/.env` avec les nouveaux `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`
+3. Backup ciblé : `/opt/skorm-bot/backups/20260708-195256-spotify-audio-fix/`
+4. Rebuild/restart : `docker compose up -d --build`
+
+**Validation prod** :
+- OAuth Spotify depuis VPS : HTTP 200 avec `access_token`
+- Lavalink `/v4/loadtracks` sur URL Spotify : `loadType=track`, source `spotify`, titre/auteur/URI présents
+- Logs Lavalink : plus de `invalid_client`
 
 ---
 
@@ -78,25 +81,32 @@ grep -E '(recv thread|packet processor|packets from|Ending recording)' /var/log/
 
 ---
 
-### 3. `/play` — Erreur 404 Unknown Message
+### 3. `/play` — Erreur 404 Unknown Message ✅ Corrigé localement
 
-**Problème** : Parfois le `/play` lève `NotFound: 404 Not Found (error code: 10008): Unknown Message`.
+**Problème initial** : Parfois le `/play` levait `NotFound: 404 Not Found (error code: 10008): Unknown Message`.
 
-**Cause** : Le bot essaie d'éditer un message de statut qui a été supprimé ou qui n'existe plus (après un restart ou un timeout).
+**Cause** : Le bot pouvait essayer d'éditer un message de statut supprimé ou expiré (après un restart ou un timeout).
 
-**Impact** : Mineur — la musique joue quand même, mais l'utilisateur voit une erreur.
+**Correction** : `bot/cogs/music.py` utilise maintenant `_safe_message_edit()` pour ignorer proprement les messages supprimés, notamment sur le menu de résultats de `/play`.
 
-**Solution** : Ajouter un try/except sur `message.edit()` dans le music cog.
+**Correction complémentaire** : les erreurs Lavalink `Failed to Load Tracks` / `Something went wrong while looking up the track` déclenchent maintenant des fallbacks :
+- URL Spotify → test OAuth client credentials ; si invalide, bypass LavaSrc direct
+- URL directe → métadonnées publiques Spotify/oEmbed titre/artiste → `ytsearch:` → `scsearch:` → recherche brute
+- `ytsearch:` autocomplete → `scsearch:` → recherche brute
+
+**Validation** : `python -m py_compile bot/cogs/music.py`
 
 ---
 
-### 4. `/pause`, `/next` — Session Lavalink périmée
+### 4. `/pause`, `/next` — Session Lavalink périmée ✅ Mitigé localement
 
-**Problème** : Après un restart de Lavalink seul (sans le bot), les commandes `/pause`, `/next`, `/skip` retournent `404 Not Found` car la session Lavalink est invalidée.
+**Problème initial** : Après un restart de Lavalink seul (sans le bot), les commandes `/pause`, `/next`, `/skip` retournaient `404 Not Found` car la session Lavalink était invalidée.
 
 **Cause** : Le bot garde une référence à un player Lavalink qui n'existe plus.
 
-**Solution** : Toujours restart les deux containers ensemble :
+**Correction** : les commandes player capturent maintenant les erreurs de session expirée, nettoient le voice client local et demandent de relancer `/play` pour recréer un player propre. `/play` retente automatiquement une lecture si la session est détectée périmée.
+
+**Procédure recommandée en prod** : redémarrer les deux containers ensemble :
 ```bash
 docker compose up -d
 ```
@@ -108,15 +118,17 @@ docker compose up -d
 | Fichier | Modification |
 |---------|-------------|
 | `bot/cogs/voice_record.py` | Rewrite complet : recv() thread dédié, queue.Queue, thread pool Opus |
-| `bot/cogs/music.py` | Fallback `ytsearch:` pour la recherche YouTube |
+| `bot/cogs/music.py` | Fallback `ytsearch:`, autocomplete, sélection des résultats, safe edit, gestion session Lavalink périmée, test OAuth Spotify runtime, reprise complète après restart |
+| `bot/cogs/db.py` | Persistance du volume par défaut musique, fallback à 20 |
+| `.env.example` | Ajout placeholders `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` |
+| `README.md` | Documentation `/play` URL/recherche et variables Lavalink/Spotify |
 | `bot/cogs/setup.py` | `_secure_voice_channels()` préserve l'accès bot aux salons vocaux |
-| `/opt/skorm-bot/.env` | Spotify credentials mises à jour (à remplacer par nouvelles clés) |
+| `/opt/skorm-bot/.env` | Spotify credentials remplacées par l'app `SKORMBOT` validée |
 
 ---
 
 ## 🎯 Priorités
 
-1. **Spotify** : Créer nouvelle app Spotify → bloquant pour `/play` Spotify
-2. **`/recordconv`** : Tester la capture audio → feature principale en cours
-3. **`/play` 404** : Try/except sur message.edit() → cosmétique
-4. **Restart Lavalink** : Documenter la procédure → UX
+1. **`/recordconv`** : Tester la capture audio → feature principale en cours
+2. **`/play` Spotify** : validé côté Lavalink, à confirmer par test Discord réel en salon vocal
+3. **Restart Lavalink** : mitigation ajoutée, garder `docker compose up -d` comme procédure standard

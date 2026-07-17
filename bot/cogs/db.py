@@ -13,8 +13,9 @@ from bot.config import DATA_DIR, DB_PATH
 # Ensure data directory exists
 os.makedirs(DATA_DIR, exist_ok=True)
 
+DEFAULT_MUSIC_VOLUME = 20
 
-SCHEMA = """
+SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS tickets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     creator_id INTEGER NOT NULL,
@@ -79,7 +80,7 @@ CREATE TABLE IF NOT EXISTS music_history (
 
 CREATE TABLE IF NOT EXISTS music_settings (
     guild_id INTEGER PRIMARY KEY,
-    default_volume INTEGER NOT NULL DEFAULT 10
+    default_volume INTEGER NOT NULL DEFAULT {DEFAULT_MUSIC_VOLUME}
 );
 
 CREATE TABLE IF NOT EXISTS chat_history (
@@ -340,14 +341,14 @@ async def save_default_volume(guild_id: int, volume: int) -> None:
 
 
 async def get_default_volume(guild_id: int) -> int:
-    """Get default volume for a guild, returns 10 if not set."""
+    """Get default volume for a guild, returns 20 if not set."""
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             "SELECT default_volume FROM music_settings WHERE guild_id = ?",
             (guild_id,)
         )
         row = await cursor.fetchone()
-        return row[0] if row else 10
+        return row[0] if row else DEFAULT_MUSIC_VOLUME
 
 
 # === Chat History ===

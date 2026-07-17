@@ -5,6 +5,22 @@
 > **Statut** : 🟢 Stable
 > **Créé** : 2026-07-05
 
+## Memoire
+- But: bot Discord d'administration complete du serveur SKORM.
+- Statut: stable, deploiement VPS prevu / a verifier.
+- Stack: Python 3.11, discord.py, SQLite, Docker.
+- Machine cible: VPS OVH `.57`.
+- Acces: serveur Discord configurable via `.env`.
+
+## Entrees rapides
+- Documentation: `README.md`
+- Suivi detaille: `PROJECT.md`
+- Blocages: `BLOCKERS.md`
+- Instructions locales: `.instructions.md`
+- Bot: `bot/`
+- Scripts: `scripts/`
+- Deploiement: `Dockerfile`, `docker-compose.yml`
+
 ---
 
 ## 🎯 Objectif
