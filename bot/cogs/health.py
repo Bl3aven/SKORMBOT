@@ -310,3 +310,7 @@ class HealthCog(commands.Cog):
 
         await interaction.followup.send(embed=embed, ephemeral=True)
         log.info("Health check completed in %.2fs: %d OK, %d WARN, %d FAIL", elapsed, ok, warn, fail)
+
+
+async def setup(bot: commands.Bot) -> None:
+    await bot.add_cog(HealthCog(bot))
